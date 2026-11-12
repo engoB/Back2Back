@@ -1,0 +1,22 @@
+{
+  "name": "back2back",
+  "version": "1.0.0",
+  "description": "BACK2BACK — Les Pentes du Temps. Jeu de glisse 3D à travers les époques (PWA, Three.js, multijoueur).",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "vite build",
+    "build:single": "vite build && node scripts/build-single.mjs",
+    "start": "node server/server.js",
+    "icons": "node scripts/gen-icons.mjs",
+    "test": "node scripts/smoke-test.mjs"
+  },
+  "dependencies": {
+    "three": "^0.187.0",
+    "ws": "^8.22.2"
+  },
+  "devDependencies": {
+    "vite": "^8.3.8"
+  }
+}

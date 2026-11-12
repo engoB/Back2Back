@@ -1,0 +1,7 @@
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  base: './',
+  build: { target: 'es2020', chunkSizeWarningLimit: 1600 },
+  server: { host: true, port: 5173, proxy: { '/ws': { target: 'ws://localhost:8787', ws: true } } },
+});
