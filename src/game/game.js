@@ -553,9 +553,9 @@ export class Game {
       this.audio.stopLoops();
       this.audio.music.play('menu', 1.5);
       if (done) done();
-      else {
+      if (!this.menus.visible) {
         this.menus.home();
-        if (prev === 'menu') this.menus.show('story');
+        if (!done && prev === 'menu') this.menus.show('story');
       }
       await this._fade(false);
     });

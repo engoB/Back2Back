@@ -297,12 +297,12 @@ export class Run {
       switch (e.type) {
         case 'jump':
           A.sfx('jump');
-          fx.landing(p.x, p.y, era.terrain.top, 0.2);
+          fx.landing(p.x, p.y, era.terrain.fill[0], 0.2);
           break;
         case 'land': {
           const power = clamp(e.impact / 14, 0.15, 1);
           A.sfx('land', { power });
-          fx.landing(p.x, p.y, era.terrain.top, power);
+          fx.landing(p.x, p.y, era.terrain.fill[0], power);
           this.rig.kickSquash(power);
           if (e.impact > 9) ctx.cam.addShake(0.18 + power * 0.2);
           if (e.airTime > this.stats.bestAir) this.stats.bestAir = e.airTime;
@@ -361,7 +361,7 @@ export class Run {
           ctx.haptic([30, 40, 30]);
           break;
         case 'tumble':
-          fx.landing(p.x, p.y, era.terrain.top, 0.5);
+          fx.landing(p.x, p.y, era.terrain.fill[0], 0.5);
           break;
         case 'crash':
           this._crash(e.cause);
@@ -382,7 +382,7 @@ export class Run {
     this.fulgurOn = false;
     ctx.audio.sfx(cause === 'fall' ? 'fall' : 'crash');
     ctx.audio.loop('grind', 0);
-    ctx.fx.burst(p.x, p.y + 0.6, 0, era.terrain.top, 22, 8, 0.5, 0.8);
+    ctx.fx.burst(p.x, p.y + 0.6, 0, era.terrain.fill[0], 22, 8, 0.5, 0.8);
     ctx.fx.burst(p.x, p.y + 0.6, 0, 0xffffff, 10, 9, 0.3, 0.4, true, 4);
     ctx.cam.addShake(0.65);
     ctx.haptic([60, 40, 80]);
@@ -469,7 +469,7 @@ export class Run {
           if (out === 'smash' || (out === 'crash' && !p.crash('rock'))) {
             this.collected.add(it.id);
             ctx.views.remove(it);
-            fx.debris(it.x, it.y, ERAS[this.eraId].terrain.wall[1], 14);
+            fx.debris(it.x, it.y, ERAS[this.eraId].terrain.fill[3], 14);
             fx.burst(it.x, it.y + 0.5, 0, 0xffffff, 6, 6, 0.3, 0.3, true, 3);
             A.sfx('smash');
             ctx.cam.addShake(0.3);
@@ -827,7 +827,7 @@ export class Run {
     // particles / trail
     if (!warp) {
       const boosting = p.boosting && !p.crashed;
-      if (p.grounded && !p.crashed && this.state !== 'countdown') fx.spray(p.x, p.y, speed, era.terrain.top, p.rot);
+      if (p.grounded && !p.crashed && this.state !== 'countdown') fx.spray(p.x, p.y, speed, era.terrain.fill[0], p.rot);
       const cs = Math.cos(p.rot), sn = Math.sin(p.rot);
       const tw = p.crashed ? 0 : this.fulgurOn ? 0.5 : boosting ? 0.34 : 0.1;
       fx.trailPoint(p.x - cs * 0.75, p.y + 0.06 - sn * 0.75, tw, this.fulgurOn ? 0xfff2a0 : this.trailColor);
