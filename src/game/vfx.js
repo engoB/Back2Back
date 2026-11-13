@@ -319,11 +319,10 @@ export class Fx {
       this.rings.push({ mesh: m, life: 0, max: 1, r0: 1, r1: 5 });
     }
 
-    // contact shadow
-    this.shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 16), new THREE.MeshBasicMaterial({
-      color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false, fog: false,
+    // contact shadow: a soft dark smudge on the slope under the board
+    this.shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 24), new THREE.MeshBasicMaterial({
+      color: 0x0a1030, transparent: true, opacity: 0.22, depthWrite: false, fog: false,
     }));
-    this.shadow.rotation.x = -Math.PI / 2;
     this.shadow.renderOrder = 5;
     scene.add(this.shadow);
     this.pixelScale = 600;
@@ -475,12 +474,11 @@ export class Fx {
     const s = this.shadow;
     s.visible = visible;
     if (!visible) return;
-    const k = clamp(1 - height / 9, 0.25, 1);
-    s.position.set(x, groundY + 0.035, 0);
-    s.rotation.set(-Math.PI / 2, 0, 0);
-    s.rotateY(slope);
-    s.scale.set(0.95 * k, 0.42 * k, 1);
-    s.material.opacity = 0.3 * k;
+    const k = clamp(1 - height / 9, 0.2, 1);
+    s.position.set(x, groundY - 0.1, 0.06);
+    s.rotation.set(0, 0, slope);
+    s.scale.set(1.0 * k, 0.11 * k, 1);
+    s.material.opacity = 0.24 * k;
   }
 
   update(dt, cx, cy) {

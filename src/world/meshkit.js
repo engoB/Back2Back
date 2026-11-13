@@ -1,5 +1,6 @@
 // Tiny procedural modelling kit: every asset of the game is built in code from
-// coloured low-poly primitives merged into one or two draw calls.
+// smooth primitives in flat colours (silhouette style), merged into one or two
+// draw calls. Nothing is lit: shapes are tinted by the mood of the sky.
 import * as THREE from 'three';
 import { mulberry32 } from '../core/rng.js';
 
@@ -30,14 +31,14 @@ function cached(key, make) {
  *  c    colour (hex)           c2   colour at the top (vertical gradient)
  *  p    [x, y, z] base point    r    [rx, ry, rz] euler rotation (radians)
  *  s    scale (number or [x, y, z])
- *  glow unlit/emissive bucket   j    per-face brightness jitter (default 0.07)
+ *  glow emissive bucket (not tinted by the mood)   j   per-face brightness jitter (default 0)
  *  mid  true: geometry is centred on p instead of standing on it
  */
 export class Kit {
   constructor(seed = 1) {
     this.buf = { lit: { pos: [], col: [] }, glow: { pos: [], col: [] } };
     this.rand = mulberry32(seed);
-    this.jitter = 0.07;
+    this.jitter = 0;
   }
 
   add(geo, o = {}, baseOffset = 0) {
@@ -90,6 +91,7 @@ export class Kit {
   }
   /** Cylinder / frustum standing on its base. */
   cyl(rTop, rBot, h, seg = 6, o = {}) {
+    if (seg > 4) seg = Math.max(seg, 12);
     const g = cached(`c${rBot === 0 ? 'inv' : (rTop / rBot).toFixed(4)}|${seg}`, () =>
       new THREE.CylinderGeometry(rBot === 0 ? 1 : rTop / rBot, rBot === 0 ? 0 : 1, 1, seg, 1));
     const k = rBot === 0 ? rTop : rBot;
@@ -97,13 +99,14 @@ export class Kit {
     return this.add(g, { ...o, pre: _m2.clone() }, h / 2);
   }
   cone(r, h, seg = 6, o = {}) {
+    if (seg > 4) seg = Math.max(seg, 12);
     const g = cached(`k${seg}`, () => new THREE.ConeGeometry(1, 1, seg, 1));
     _m2.makeScale(r, h, r);
     return this.add(g, { ...o, pre: _m2.clone() }, h / 2);
   }
-  /** Faceted blob (icosahedron), centred on p. */
+  /** Smooth blob (sphere), centred on p. */
   ball(r, detail = 0, o = {}) {
-    const g = cached(`b${detail}`, () => new THREE.IcosahedronGeometry(1, detail));
+    const g = cached('ball', () => new THREE.SphereGeometry(1, 14, 10));
     return this.add(g, { ...o, s: mulScale(o.s, r), mid: true });
   }
   /** Octahedron crystal standing on its tip. */
@@ -113,6 +116,8 @@ export class Kit {
     return this.add(g, { ...o, pre: _m2.clone() }, h / 2);
   }
   torus(R, r, segR = 5, segT = 12, o = {}) {
+    segR = Math.max(segR, 6);
+    if (segT > 4) segT = Math.max(segT, 20);
     const g = cached(`t${(r / R).toFixed(3)}|${segR}|${segT}|${o.arc || 0}`, () =>
       new THREE.TorusGeometry(1, r / R, segR, segT, o.arc || Math.PI * 2));
     return this.add(g, { ...o, s: mulScale(o.s, R), mid: true });
@@ -189,8 +194,9 @@ function makeGear(R, teeth, thick, hole) {
 
 // Shared materials --------------------------------------------------------
 export const MAT = {
-  lit: new THREE.MeshLambertMaterial({ vertexColors: true }),
-  litDouble: new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }),
+  // "lit" = tinted by the ambient mood (set every frame by the World); flat, no shading
+  lit: new THREE.MeshBasicMaterial({ vertexColors: true }),
+  litDouble: new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }),
   glow: new THREE.MeshBasicMaterial({ vertexColors: true, fog: true }),
   glowAdd: new THREE.MeshBasicMaterial({
     vertexColors: true, fog: false, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,

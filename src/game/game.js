@@ -67,8 +67,8 @@ class Hub {
     this.rig.tilt.rotation.z = this.course.slopeAt(0);
     const tx = -10;
     this.tower.scale.setScalar(0.8);
-    this.tower.position.set(tx, g.world.groundY(tx, -15) - 0.6, -15);
-    this.tower.rotation.y = 0.4;
+    this.tower.position.set(tx, g.world.groundY(tx) - 2.2, -9);
+    this.tower.rotation.y = 0.25;
     g.engine.scene.add(this.tower);
     this.first = true;
   }
@@ -93,12 +93,12 @@ class Hub {
     const sway = Math.sin(this.t * 0.16);
     if (this.view === 'shop') {
       this.spin += dt * 0.6;
-      px = lerp(1.2, 0.3, portrait); py = y + lerp(1.5, 1.2, portrait); pz = lerp(6.8, 12.7, portrait);
-      lx = lerp(1.9, 0, portrait); ly = y + lerp(0.95, -1.0, portrait); fov = 30;
+      px = lerp(1.9, 0, portrait); py = y + lerp(1.1, -0.7, portrait); pz = lerp(6.8, 12.7, portrait);
+      lx = px; ly = y + lerp(0.95, -1.0, portrait); fov = 30;
     } else {
       this.spin = damp(this.spin, 0, 4, dt);
-      px = lerp(4.5, 2.6, portrait) + sway * 1.6; py = y + lerp(2.0, 2.2, portrait); pz = lerp(13, 15.5, portrait);
-      lx = lerp(3.4, 0.2, portrait) + sway * 0.5; ly = y + lerp(1.7, 1.3, portrait); fov = lerp(30, 40, portrait);
+      px = lerp(3.6, 0.3, portrait) + sway * 1.2; py = y + lerp(2.6, 2.8, portrait); pz = lerp(17, 21, portrait);
+      lx = px; ly = y + lerp(2.1, 1.6, portrait); fov = lerp(30, 40, portrait);
     }
     if (this.first) {
       this.pos.set(px, py, pz);
@@ -112,6 +112,7 @@ class Hub {
     g.cam.shot(this.pos, this.look, damp(g.cam.fov, fov, 3, dt));
     g.cam.apply(dt);
     this.rig.root.rotation.y = this.spin;
+    this.rig.setTint(g.world.tint);
     this.rig.update(dt);
     this.tower.setTime(23.96 + ((this.t * 0.002) % 0.04));
     g.fx.setViewport(e.height, e.camera.fov);

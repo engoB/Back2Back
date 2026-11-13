@@ -26,7 +26,8 @@ export class Hud {
     }
     // gauge
     this.gaugeFill = h('i');
-    this.gauge = h('div.hud-gauge', icon('bolt'), h('div.bar', this.gaugeFill), h('span', t('hud.fulgur')));
+    this.gaugeLabel = h('span', t('hud.fulgur'));
+    this.gauge = h('div.hud-gauge', icon('bolt'), h('div.bar', this.gaugeFill), this.gaugeLabel);
     // combo
     this.comboMult = h('b', '×1');
     this.comboPot = h('span', '0');
@@ -74,7 +75,7 @@ export class Hud {
     this.last = {};
     this.race.classList.toggle('hidden', mode !== 'race');
     this.goal.classList.toggle('hidden', !(mode === 'race' || mode === 'story'));
-    this.gauge.querySelector('span').textContent = t('hud.fulgur');
+    this.gaugeLabel.textContent = t('hud.fulgur');
     this.combo.querySelector('em').textContent = t('hud.combo');
     this.tricks.textContent = '';
     this.toasts.textContent = '';

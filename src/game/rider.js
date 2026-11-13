@@ -1,12 +1,21 @@
-// Procedural low-poly rider: a small IK puppet built from boxes, posed by a
-// handful of parameters (crouch, lean, hand targets...). No animation files.
+// Procedural rider: a small IK puppet made of smooth rounded shapes in flat
+// colours, posed by a handful of parameters (crouch, lean, hand targets...).
+// No animation files, no lighting: the puppet is tinted by the ambient mood.
 import * as THREE from 'three';
 import { RIDERS, BOARDS } from './catalog.js';
 import { damp, lerp, clamp } from '../core/math.js';
 
 const BOX = new THREE.BoxGeometry(1, 1, 1);
-const BALL = new THREE.IcosahedronGeometry(1, 1);
-const CYL = new THREE.CylinderGeometry(1, 1, 1, 10);
+const BALL = new THREE.SphereGeometry(1, 16, 12);
+const CYL = new THREE.CylinderGeometry(1, 1, 1, 16);
+// unit-height rounded limb (a capsule squeezed to height 1, diameter 1)
+const ROUND = new THREE.CapsuleGeometry(0.5, 0.5, 5, 14);
+ROUND.scale(1, 1 / 1.5, 1);
+const _tc = new THREE.Color();
+const shade = (hex, k) => {
+  _tc.set(hex).multiplyScalar(k);
+  return _tc.getHex();
+};
 const UP = new THREE.Vector3(0, 1, 0);
 const _d = new THREE.Vector3(), _n = new THREE.Vector3(), _p = new THREE.Vector3();
 const _q = new THREE.Quaternion();
@@ -142,6 +151,7 @@ export class RiderRig {
     this.boardSpin = 0;
     this.detached = false;
     this.ghost = false;
+    this.tintColor = new THREE.Color(1, 1, 1);
     this.mats = new Map();
     this.riderId = null;
     this.boardId = null;
@@ -152,7 +162,11 @@ export class RiderRig {
     const key = (glow ? 'g' : 'l') + color;
     let m = this.mats.get(key);
     if (!m) {
-      m = glow ? new THREE.MeshBasicMaterial({ color }) : new THREE.MeshLambertMaterial({ color, flatShading: true });
+      m = new THREE.MeshBasicMaterial({ color, fog: !glow });
+      if (!glow) {
+        m.userData.base = new THREE.Color(color);
+        m.color.copy(m.userData.base).multiply(this.tintColor);
+      }
       if (this.ghost) {
         m.transparent = true;
         m.opacity = 0.5;
@@ -161,6 +175,13 @@ export class RiderRig {
       this.mats.set(key, m);
     }
     return m;
+  }
+
+  /** Ambient tint of the world (dusk, night...), applied to the flat colours. */
+  setTint(c) {
+    if (this.tintColor.equals(c)) return;
+    this.tintColor.copy(c);
+    for (const m of this.mats.values()) if (m.userData.base) m.color.copy(m.userData.base).multiply(c);
   }
 
   part(parent, geo, color, sx, sy, sz, x = 0, y = 0, z = 0, glow = false) {
@@ -193,66 +214,64 @@ export class RiderRig {
     this.bulk = k;
     this.body.scale.setScalar(R.scale);
 
-    // ---- board
+    // ---- board (a long rounded deck with upturned tips and a glowing keel)
     const bg = this.boardG;
-    this.part(bg, BOX, B.deck, 1.42, 0.05, 0.36, 0, 0.065, 0);
-    const nose = this.part(bg, BOX, B.deck, 0.26, 0.05, 0.36, 0.8, 0.105, 0);
-    nose.rotation.z = 0.38;
-    const tail = this.part(bg, BOX, B.deck, 0.26, 0.05, 0.36, -0.8, 0.105, 0);
-    tail.rotation.z = -0.38;
-    this.part(bg, BOX, B.trim, 1.1, 0.012, 0.09, 0, 0.094, 0);
-    this.part(bg, BOX, B.trim, 0.2, 0.03, 0.4, 0.27, 0.095, 0);
-    this.part(bg, BOX, B.trim, 0.2, 0.03, 0.4, -0.27, 0.095, 0);
-    this.glowStrip = this.part(bg, BOX, B.glow, 1.2, 0.022, 0.2, 0, 0.035, 0, true);
-    this.part(bg, BOX, B.trim, 0.16, 0.07, 0.3, -0.62, 0.05, 0);
+    this.part(bg, BOX, B.deck, 1.42, 0.055, 0.36, 0, 0.065, 0);
+    const nose = this.part(bg, ROUND, B.deck, 0.36, 0.055, 0.36, 0.78, 0.1, 0);
+    nose.rotation.z = 0.36;
+    const tail = this.part(bg, ROUND, B.deck, 0.36, 0.055, 0.36, -0.78, 0.1, 0);
+    tail.rotation.z = -0.36;
+    this.part(bg, BOX, B.trim, 1.1, 0.014, 0.37, 0, 0.096, 0);
+    this.glowStrip = this.part(bg, BOX, B.glow, 1.25, 0.03, 0.37, 0, 0.03, 0, true);
 
-    // ---- body parts
+    // ---- body parts (far-side limbs a shade darker so the pose stays readable)
     const b = this.body;
     const P = (this.parts = {});
-    P.pelvis = this.part(b, BOX, R.pants, 0.3 * k, 0.17, 0.2 * k);
-    P.torso = this.part(b, BOX, R.jacket, 1, 1, 1);
+    P.pelvis = this.part(b, BALL, R.pants, 0.17 * k, 0.11, 0.115 * k);
+    P.torso = this.part(b, ROUND, shade(R.jacket, 0.93), 1, 1, 1);
     for (const s of ['L', 'R']) {
-      P['thigh' + s] = this.part(b, BOX, R.pants, 1, 1, 1);
-      P['shin' + s] = this.part(b, BOX, R.pants, 1, 1, 1);
-      P['foot' + s] = this.part(b, BOX, R.boots, 0.15 * k, 0.12, 0.28);
-      P['uArm' + s] = this.part(b, BOX, R.jacket, 1, 1, 1);
-      P['fArm' + s] = this.part(b, BOX, R.jacket, 1, 1, 1);
-      P['hand' + s] = this.part(b, BOX, R.glove, 0.09, 0.1, 0.09);
+      const f = s === 'L' ? 0.8 : 1;
+      P['thigh' + s] = this.part(b, ROUND, shade(R.pants, f), 1, 1, 1);
+      P['shin' + s] = this.part(b, ROUND, shade(R.pants, f), 1, 1, 1);
+      P['foot' + s] = this.part(b, BALL, shade(R.boots, f), 0.085 * k, 0.07, 0.15);
+      P['uArm' + s] = this.part(b, ROUND, shade(R.jacket, f), 1, 1, 1);
+      P['fArm' + s] = this.part(b, ROUND, shade(R.jacket, f), 1, 1, 1);
+      P['hand' + s] = this.part(b, BALL, shade(R.glove, f), 0.055, 0.055, 0.055);
     }
     if (R.coat !== undefined) {
       P.coat = new THREE.Group();
-      this.part(P.coat, BOX, R.coat, 0.34 * k, 0.5, 0.05, 0, -0.25, 0);
+      this.part(P.coat, ROUND, R.coat, 0.36 * k, 0.56, 0.07, 0, -0.26, 0);
       b.add(P.coat);
     }
     if (R.pack !== undefined) {
-      P.pack = this.part(b, BOX, R.pack, 0.26, 0.3, 0.14);
+      P.pack = this.part(b, ROUND, R.pack, 0.26, 0.32, 0.15);
       P.packGlow = this.part(b, BALL, R.accent, 0.05, 0.05, 0.05, 0, 0, 0, true);
     }
-    if (!R.robot) P.belt = this.part(b, BOX, R.accent, 0.31 * k, 0.04, 0.21 * k);
+    if (!R.robot) P.belt = this.part(b, CYL, R.accent, 0.165 * k, 0.04, 0.115 * k);
 
     // ---- head
     const h = (P.head = new THREE.Group());
     b.add(h);
     if (R.head === 'robot') {
-      this.part(h, BOX, R.skin, 0.27, 0.22, 0.24);
-      this.part(h, BOX, R.accent, 0.2, 0.06, 0.02, 0, 0.02, 0.125, true);
+      this.part(h, ROUND, R.skin, 0.27, 0.23, 0.24);
+      this.part(h, ROUND, R.accent, 0.2, 0.07, 0.03, 0, 0.02, 0.125, true);
       this.part(h, CYL, R.pants, 0.012, 0.14, 0.012, 0.06, 0.17, 0);
       this.part(h, BALL, R.accent, 0.03, 0.03, 0.03, 0.06, 0.25, 0, true);
       this.part(h, CYL, R.pants, 0.05, 0.31, 0.05).rotation.z = Math.PI / 2;
       this.part(h, BOX, R.pants, 0.12, 0.02, 0.02, 0, -0.06, 0.125);
     } else {
       this.part(h, BALL, R.skin, 0.132, 0.14, 0.132);
-      this.part(h, BOX, 0x1c1c24, 0.028, 0.034, 0.02, -0.05, 0.01, 0.125);
-      this.part(h, BOX, 0x1c1c24, 0.028, 0.034, 0.02, 0.05, 0.01, 0.125);
+      this.part(h, BALL, 0x1c1c24, 0.016, 0.02, 0.012, -0.05, 0.01, 0.125);
+      this.part(h, BALL, 0x1c1c24, 0.016, 0.02, 0.012, 0.05, 0.01, 0.125);
       if (R.head === 'helmet') {
         this.part(h, BALL, R.jacket, 0.158, 0.16, 0.165, 0, 0.02, -0.015);
-        this.part(h, BOX, R.accent, 0.2, 0.075, 0.03, 0, 0.012, 0.14, true);
-        this.part(h, BOX, R.accent, 0.03, 0.03, 0.2, 0, 0.17, -0.02, true);
+        this.part(h, ROUND, R.accent, 0.21, 0.085, 0.05, 0, 0.012, 0.135, true);
+        this.part(h, ROUND, R.accent, 0.03, 0.03, 0.2, 0, 0.17, -0.02, true);
       } else {
         this.part(h, BALL, R.hair, 0.143, 0.115, 0.15, 0, 0.045, -0.025);
         if (R.head === 'goggles') {
           this.part(h, CYL, 0x23232c, 0.142, 0.05, 0.142, 0, 0.07, 0);
-          this.part(h, BOX, R.accent, 0.17, 0.055, 0.03, 0, 0.07, 0.132, true);
+          this.part(h, ROUND, R.accent, 0.18, 0.065, 0.04, 0, 0.07, 0.128, true);
         } else if (R.head === 'beanie') {
           this.part(h, BALL, R.accent, 0.15, 0.115, 0.15, 0, 0.075, -0.01);
           this.part(h, CYL, R.jacket, 0.152, 0.045, 0.152, 0, 0.045, -0.005);
@@ -269,10 +288,10 @@ export class RiderRig {
     }
     if (R.hair3d === 'ponytail') {
       P.pony = new THREE.Group();
-      this.part(P.pony, BOX, R.hair, 0.07, 0.2, 0.07, 0, -0.1, 0);
+      this.part(P.pony, ROUND, R.hair, 0.085, 0.22, 0.085, 0, -0.1, 0);
       const seg = new THREE.Group();
       seg.position.y = -0.2;
-      this.part(seg, BOX, R.hair, 0.055, 0.18, 0.055, 0, -0.09, 0);
+      this.part(seg, ROUND, R.hair, 0.065, 0.2, 0.065, 0, -0.09, 0);
       P.pony.add(seg);
       P.pony2 = seg;
       b.add(P.pony);
@@ -354,13 +373,14 @@ export class RiderRig {
 
     S.pelvis.position.copy(M.hip);
     S.pelvis.rotation.set(0, P.twist * 0.4, 0);
+    S.pelvis.position.y -= 0.02;
     if (S.belt) {
       S.belt.position.copy(M.hip).addScaledVector(M.spine, 0.09);
       S.belt.rotation.set(0, P.twist * 0.5, 0);
     }
     M.a.copy(M.hip).addScaledVector(M.spine, 0.05);
     M.b.copy(M.chest).addScaledVector(M.spine, 0.07);
-    bone(S.torso, M.a, M.b, 0.37 * K, 0.23 * K, 0.02);
+    bone(S.torso, M.a, M.b, 0.36 * K, 0.24 * K, 0.1);
     _q.setFromAxisAngle(UP, P.twist);
     S.torso.quaternion.multiply(_q);
 
@@ -371,9 +391,9 @@ export class RiderRig {
       M.a.set(M.hip.x + s * 0.1 * K, M.hip.y - 0.05, M.hip.z);
       M.bend.set(s * 0.5, 0.1, 1);
       ik(M.a, foot, L_THIGH, L_SHIN, M.bend, M.j, M.e);
-      bone(S['thigh' + n], M.a, M.j, 0.15 * K, 0.15 * K);
-      bone(S['shin' + n], M.j, M.e, 0.125 * K, 0.125 * K);
-      S['foot' + n].position.set(M.e.x, M.e.y - 0.025, M.e.z + 0.045);
+      bone(S['thigh' + n], M.a, M.j, 0.16 * K, 0.16 * K, 0.12);
+      bone(S['shin' + n], M.j, M.e, 0.13 * K, 0.13 * K, 0.1);
+      S['foot' + n].position.set(M.e.x, M.e.y - 0.02, M.e.z + 0.05);
     }
     // arms
     for (const s of [-1, 1]) {
@@ -383,8 +403,8 @@ export class RiderRig {
       M.b.copy(M.chest).add(hand);
       M.bend.set(s * 0.4, -0.7, -0.5);
       ik(M.a, M.b, L_UARM, L_FARM, M.bend, M.j, M.e);
-      bone(S['uArm' + n], M.a, M.j, 0.115 * K, 0.115 * K);
-      bone(S['fArm' + n], M.j, M.e, 0.1 * K, 0.1 * K);
+      bone(S['uArm' + n], M.a, M.j, 0.12 * K, 0.12 * K, 0.09);
+      bone(S['fArm' + n], M.j, M.e, 0.1 * K, 0.1 * K, 0.08);
       S['hand' + n].position.copy(M.e);
     }
     // head

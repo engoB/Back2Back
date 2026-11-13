@@ -1,4 +1,4 @@
-// Side-on follow camera with a slight 3/4 angle, speed/air zoom and shake.
+// Side-on follow camera (pure profile view) with speed/air zoom and shake.
 // Also drives free shots for cinematics and menus.
 import * as THREE from 'three';
 import { clamp, damp, lerp, DEG } from '../core/math.js';
@@ -15,8 +15,8 @@ export class CameraRig {
     this.trauma = 0;
     this.shakeEnabled = true;
     this.t = 0;
-    this.yaw = 0.2;
-    this.pitch = 0.1;
+    this.yaw = 0;
+    this.pitch = 0.045;
     this.fov = 32;
     this.roll = 0;
     this.snap = true;
@@ -33,7 +33,7 @@ export class CameraRig {
     const vFov = lerp(30, 47, portrait);
     const speed = Math.hypot(p.vx, p.vy);
     const air = Math.max(0, p.y - ground);
-    const wTarget = lerp(36, 26, portrait) + clamp((speed - 14) * 0.55, 0, 10) + clamp(air * 0.95, 0, 15) + (opts.extra || 0);
+    const wTarget = lerp(33, 24, portrait) + clamp((speed - 14) * 0.55, 0, 10) + clamp(air * 0.95, 0, 15) + (opts.extra || 0);
     this.width = this.snap ? wTarget : damp(this.width, wTarget, 2.2, dt);
     const hFov = 2 * Math.atan(Math.tan((vFov * DEG) / 2) * aspect);
     const dist = this.width / 2 / Math.tan(hFov / 2);
@@ -42,14 +42,14 @@ export class CameraRig {
     const visH = 2 * dist * Math.tan((vFov * DEG) / 2);
     const tx = p.x + lead;
     // keep both the rider and the ground below in frame
-    const ty = lerp(p.y, ground, 0.5) + visH * lerp(0.1, 0.15, portrait) + clamp(air * 0.1, 0, 3);
+    const ty = lerp(p.y, ground, 0.5) + visH * lerp(0.07, 0.11, portrait) + clamp(air * 0.1, 0, 3);
     if (this.snap) this.look.set(tx, ty, 0);
     else {
       this.look.x = damp(this.look.x, tx, 9, dt);
       this.look.y = damp(this.look.y, ty, 5.5, dt);
       this.look.z = 0;
     }
-    const yaw = lerp(0.2, 0.13, portrait), pitch = lerp(0.045, 0.06, portrait);
+    const yaw = 0, pitch = lerp(0.045, 0.05, portrait);
     this.yaw = this.snap ? yaw : damp(this.yaw, yaw, 3, dt);
     this.pitch = this.snap ? pitch : damp(this.pitch, pitch, 3, dt);
     _dir.set(-Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), Math.cos(this.yaw) * Math.cos(this.pitch));

@@ -808,6 +808,7 @@ export class Run {
 
     // rider
     const rig = this.rig;
+    rig.setTint(ctx.world.tint);
     rig.root.position.set(p.x, p.y + 0.03, 0);
     if (warp) {
       rig.tilt.rotation.z = Math.sin(this.time * 2.2) * 0.22 + 0.12;
@@ -845,6 +846,7 @@ export class Run {
     const now = performance.now() / 1000;
     for (const r of this.rivals) {
       const s = r.bot ? r.bot.player : r.net.sample(now);
+      r.rig.setTint(ctx.world.tint);
       r.rig.root.position.set(s.x, s.y + 0.03, r.z);
       r.rig.tilt.rotation.z = s.rot;
       r.rig.drive(dt, s, false);

@@ -255,17 +255,21 @@ export class ItemViews {
 
   _makeGap(gap) {
     const course = this.course;
-    const y = Math.min(course.baseAt(gap.x1), course.baseAt(gap.x2)) - 7;
-    const geo = new THREE.PlaneGeometry(gap.x2 - gap.x1 + 6, 26);
-    const mat = new THREE.MeshBasicMaterial({ color: this.era.chasm, fog: false, transparent: true, opacity: 0.92 });
-    const m = new THREE.Mesh(geo, mat);
-    m.rotation.x = -Math.PI / 2;
-    m.position.set((gap.x1 + gap.x2) / 2, y, -7.4);
+    const top = Math.min(course.baseAt(gap.x1), course.baseAt(gap.x2)) - 1.5;
+    const x1 = gap.x1 - 0.3, x2 = gap.x2 + 0.3, bot = top - 60;
+    // a curtain of light rising from the depths (additive: black at the top = invisible)
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute([x1, bot, -0.4, x2, bot, -0.4, x2, top, -0.4, x1, bot, -0.4, x2, top, -0.4, x1, top, -0.4], 3));
+    const c = new THREE.Color(this.era.chasm);
+    g.setAttribute('color', new THREE.Float32BufferAttribute([c.r, c.g, c.b, c.r, c.g, c.b, 0, 0, 0, c.r, c.g, c.b, 0, 0, 0, 0, 0, 0], 3));
+    const mat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+    const m = new THREE.Mesh(g, mat);
+    m.frustumCulled = false;
     m.userData.own = true;
     m.userData.ownMat = true;
-    const g = new THREE.Group();
-    g.add(m);
-    return { group: g, x: (gap.x1 + gap.x2) / 2, y, w: gap.x2 - gap.x1 };
+    const group = new THREE.Group();
+    group.add(m);
+    return { group, x: (gap.x1 + gap.x2) / 2, y: top - 12, w: gap.x2 - gap.x1 };
   }
 
   _makePortal(it) {
@@ -479,7 +483,7 @@ export class ItemViews {
         this.gapViews.set(i, v);
       }
       if (Math.random() < dt * 9) {
-        this.fx.add.emit(v.x + (Math.random() - 0.5) * v.w, v.y + 1, 2.6 - Math.random() * 9, (Math.random() - 0.5) * 0.6, 2.5 + Math.random() * 3, 0,
+        this.fx.add.emit(v.x + (Math.random() - 0.5) * v.w, v.y + 1, -0.2, (Math.random() - 0.5) * 0.6, 3 + Math.random() * 4, 0,
           1.4 + Math.random(), 0.3, 0.05, ...this._chasmRGB(), 0.9, -0.4, 0.3);
       }
     }

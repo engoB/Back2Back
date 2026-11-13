@@ -55,12 +55,13 @@ function frame(now) {
   if (!frozen) sim(dt);
   dummy.position.set(player.x, player.y, 0);
   rigR.tilt.rotation.z = player.rot;
+  rigR.setTint(world.tint);
   rigR.drive(dt, player, false);
-  for (const r of lineup) r.update(dt);
+  for (const r of lineup) { r.setTint(world.tint); r.update(dt); }
   const ground = course.solidAt(player.x);
   if (lineup.length) {
     const cx = 2 + 2.5 * 1.9;
-    rig.shot(new THREE.Vector3(cx - 1.5, course.solidAt(cx) + 1.6, 9.5), new THREE.Vector3(cx, course.solidAt(cx) + 0.75, 0), 34);
+    rig.shot(new THREE.Vector3(cx, course.solidAt(cx) + 1.0, 11), new THREE.Vector3(cx, course.solidAt(cx) + 0.8, 0), 30);
     rig.apply(dt);
   } else rig.follow(dt, player, ground, engine.aspect);
   world.aspect = engine.aspect;
