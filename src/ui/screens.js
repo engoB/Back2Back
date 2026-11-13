@@ -94,6 +94,11 @@ export class Menus {
     if (!this.modal) return;
     const m = this.modal;
     this.modal = null;
+    if (this.modalCleanup) {
+      const fn = this.modalCleanup;
+      this.modalCleanup = null;
+      fn();
+    }
     m.classList.remove('open');
     setTimeout(() => m.remove(), 220);
   }
@@ -603,6 +608,8 @@ export function reviveModal(m, count, cb) {
     h('h2', t('revive.title')),
     btn(t('revive.use', { n: count }), () => finish(true), 'primary big', 'heart'),
     btn(t('revive.no'), () => finish(false), 'ghost')), false);
+  // if the prompt is closed from outside (scene change), it counts as a refusal
+  m.modalCleanup = () => finish(false);
 }
 
 /** Daily gift popup. */

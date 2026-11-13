@@ -171,6 +171,7 @@ export class Run {
   }
 
   dispose() {
+    this.disposed = true;
     const scene = this.ctx.engine.scene;
     this.rig.dispose();
     for (const r of this.rivals) r.rig.dispose();
@@ -405,6 +406,7 @@ export class Run {
       this.asking = true;
       this.paused = true;
       ctx.askRevive(save.data.items.revive, (yes) => {
+        if (this.disposed) return;
         this.asking = false;
         this.paused = false;
         if (yes) {
@@ -637,6 +639,7 @@ export class Run {
     ctx.fx.clear();
     ctx.fx.setShadow(0, 0, 0, 0, false);
     ctx.hud.yearRoll(this.eraId, this.nextEra, WARP_TIME - 0.4);
+    ctx.hud.hint(null);
     ctx.input.reset();
   }
 
@@ -706,7 +709,7 @@ export class Run {
 
   /** Bank everything and hand the summary to the game. */
   _end(kind) {
-    if (this.ended) return;
+    if (this.ended || this.disposed) return;
     this.ended = true;
     const d = save.data, st = this.stats, ctx = this.ctx;
     this.state = 'over';

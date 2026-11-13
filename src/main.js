@@ -49,7 +49,7 @@ requestAnimationFrame(() => {
 });
 
 // Offline support (production builds only)
-if (import.meta.env.PROD && 'serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+if (import.meta.env.PROD && 'serviceWorker' in navigator && /^https?:$/.test(location.protocol) && document.querySelector('link[rel="manifest"]')) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').then((reg) => {
       const ready = () => { if (game) game.swReady = true; };
