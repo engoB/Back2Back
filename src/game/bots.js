@@ -1,6 +1,7 @@
 // AI riders: used for the "race against the AI" mode, to fill multiplayer rooms
 // offline, for the attract mode and for automated balance tests.
 import { PHYS, Player } from './player.js';
+import { ROCK_SIZES, hitsRock, rockOutcome } from './rules.js';
 import { wrapPi, TAU } from '../core/math.js';
 import { RNG } from '../core/rng.js';
 
@@ -162,20 +163,4 @@ export class BotRider {
   }
 }
 
-export const ROCK_SIZES = [
-  { hw: 0.62, h: 0.8 },
-  { hw: 0.78, h: 1.1 },
-];
-
-/** 'none' | 'crash' | 'smash' — a rider coming down from a big air crushes the rock. */
-export function rockOutcome(p, it) {
-  if (!hitsRock(p, it)) return 'none';
-  if (p.boosting || p.stompT > 0 || p.invulnT > 0) return 'smash';
-  if (!p.grounded && !p.rail && p.airTime > 1.25 && p.vy < 0) return 'smash';
-  return 'crash';
-}
-
-export function hitsRock(p, it) {
-  const s = ROCK_SIZES[it.size] || ROCK_SIZES[0];
-  return Math.abs(p.x - it.x) < s.hw + 0.28 && p.y - it.y < s.h;
-}
+export { ROCK_SIZES, hitsRock, rockOutcome };

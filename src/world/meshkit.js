@@ -126,6 +126,17 @@ export class Kit {
     const g = cached(`g${teeth}|${(thick / R).toFixed(3)}|${o.hole ?? 0.35}`, () => makeGear(1, teeth, thick / R, o.hole ?? 0.35));
     return this.add(g, { ...o, s: mulScale(o.s, R), mid: true });
   }
+  /** Extruded 2D polygon (points = [x0, y0, x1, y1, ...]) in the XY plane, centred in z. */
+  extrude(points, depth, o = {}) {
+    const shape = new THREE.Shape();
+    for (let i = 0; i < points.length; i += 2) {
+      if (i === 0) shape.moveTo(points[i], points[i + 1]);
+      else shape.lineTo(points[i], points[i + 1]);
+    }
+    const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
+    g.translate(0, 0, -depth / 2);
+    return this.add(g.toNonIndexed(), { ...o, mid: true });
+  }
   /** Raw triangles: flat array of xyz in local space. */
   tris(arr, o = {}) {
     const g = new THREE.BufferGeometry();

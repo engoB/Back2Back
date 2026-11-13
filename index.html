@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>BACK2BACK — Les Pentes du Temps</title>
+    <meta name="description" content="BACK2BACK — glisse en 3D à travers les époques. Enchaîne les figures, charge la Fulgur, saute dans le temps. Jouable hors ligne, multijoueur." />
+    <meta name="theme-color" content="#0a0f24" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="BACK2BACK" />
+    <meta name="application-name" content="BACK2BACK" />
+    <meta property="og:title" content="BACK2BACK — Les Pentes du Temps" />
+    <meta property="og:description" content="Glisse en 3D à travers les époques. Enchaîne les figures, saute dans le temps." />
+    <meta property="og:type" content="website" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <style>
+      html, body { margin: 0; height: 100%; background: #05070f; overflow: hidden; }
+      #boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #f3f6ff; font-family: system-ui, sans-serif; }
+    </style>
+  </head>
+  <body>
+    <canvas id="game" tabindex="0" aria-label="BACK2BACK"></canvas>
+    <div id="ui"></div>
+    <div id="boot">
+      <div class="logo" aria-label="BACK2BACK">
+        <span class="logo-w">BACK</span><span class="logo-2"><i>2</i></span><span class="logo-w flip">BACK</span>
+      </div>
+      <p class="sub" id="boot-sub">Les Pentes du Temps</p>
+      <div class="loadbar"><i id="boot-bar"></i></div>
+      <p class="tap-start" id="boot-tap" hidden>Toucher pour commencer</p>
+    </div>
+    <noscript><p style="color:#fff;text-align:center;font-family:sans-serif;padding:40px">BACK2BACK a besoin de JavaScript pour fonctionner.</p></noscript>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
