@@ -352,6 +352,10 @@ details.card .text { width: 100%; font-size: 13px; }
 .hud-combo .bar i { display: block; height: 100%; background: var(--gold); transform-origin: left; }
 .hud-combo.bump b { animation: bump 0.25s ease-out; }
 @keyframes bump { 30% { transform: scale(1.5); } }
+.hud[data-mode='race'] .hud-combo { top: calc(var(--sat) + 112px); }
+.hud[data-mode='race'] .hud-tricks { top: calc(var(--sat) + 200px); }
+.hud[data-mode='story'] .hud-combo { top: calc(var(--sat) + 90px); }
+.hud[data-mode='story'] .hud-tricks { top: calc(var(--sat) + 180px); }
 .hud-tricks { position: absolute; top: calc(var(--sat) + 168px); left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .trick { display: flex; align-items: baseline; gap: 8px; font-weight: 900; font-style: italic; animation: trick 1.5s ease-out forwards; white-space: nowrap; }
 .trick b { font-size: 17px; letter-spacing: 0.04em; text-transform: uppercase; }
@@ -447,8 +451,10 @@ details.card .text { width: 100%; font-size: 13px; }
   .screen.bottom { background: linear-gradient(90deg, rgba(8, 12, 32, 0.1) 0%, rgba(8, 12, 32, 0.2) 40%, rgba(8, 12, 32, 0.85) 100%); }
   .item-card { width: 210px; }
   .item-card p { min-height: 0; }
-  .hud-combo { top: calc(var(--sat) + 52px); }
-  .hud-tricks { top: calc(var(--sat) + 132px); }
+  .hud-combo, .hud[data-mode='story'] .hud-combo { top: calc(var(--sat) + 56px); }
+  .hud-tricks, .hud[data-mode='story'] .hud-tricks { top: calc(var(--sat) + 136px); }
+  .hud[data-mode='race'] .hud-combo { top: calc(var(--sat) + 74px); }
+  .hud[data-mode='race'] .hud-tricks { top: calc(var(--sat) + 150px); }
   .hud-hint { bottom: 13%; flex-direction: row; padding: 10px 18px; font-size: 15px; width: auto; max-width: 80vw; }
   .hud-hint .tap { width: 34px; height: 34px; flex: none; }
   .hud-card { top: 17%; }

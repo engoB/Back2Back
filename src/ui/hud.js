@@ -72,6 +72,7 @@ export class Hud {
 
   setMode(mode, info = {}) {
     this.mode = mode;
+    this.el.dataset.mode = mode;
     this.last = {};
     this.race.classList.toggle('hidden', mode !== 'race');
     this.goal.classList.toggle('hidden', !(mode === 'race' || mode === 'story'));

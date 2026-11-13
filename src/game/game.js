@@ -411,7 +411,7 @@ export class Game {
     const list = [];
     for (let i = 0; i < rivals; i++) {
       list.push({
-        id: 'bot' + i, name: `${names[i]} · ${t('mp.bot')}`, bot: true, skill: 0.45 + Math.random() * 0.45, seed: seed + i * 31,
+        id: 'bot' + i, name: `${names[i]} · ${t('mp.bot')}`, bot: true, skill: 0.22 + Math.random() * 0.5, seed: seed + i * 31,
         rider: RIDER_ORDER[1 + Math.floor(Math.random() * 4)], board: BOARD_ORDER[Math.floor(Math.random() * 5)],
       });
     }
