@@ -195,9 +195,10 @@ function makeGear(R, teeth, thick, hole) {
 // Shared materials --------------------------------------------------------
 export const MAT = {
   // "lit" = tinted by the ambient mood (set every frame by the World); flat, no shading
-  lit: new THREE.MeshBasicMaterial({ vertexColors: true }),
+  // (double sided: flat drawings are mirrored through their instance matrix)
+  lit: new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }),
   litDouble: new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }),
-  glow: new THREE.MeshBasicMaterial({ vertexColors: true, fog: true }),
+  glow: new THREE.MeshBasicMaterial({ vertexColors: true, fog: true, side: THREE.DoubleSide }),
   glowAdd: new THREE.MeshBasicMaterial({
     vertexColors: true, fog: false, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
   }),

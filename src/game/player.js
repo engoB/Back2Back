@@ -1,6 +1,6 @@
 // Rider physics in the x/y plane. Shared by the local player, bots and tests,
 // so it has no rendering or audio dependency: it only pushes events.
-import { clamp, wrapPi, approach, dampAngle, TAU } from '../core/math.js';
+import { clamp, wrapPi, approach, damp, dampAngle, TAU } from '../core/math.js';
 
 export const PHYS = {
   G: 19,
@@ -57,6 +57,8 @@ export class Player {
     this.lastSafeX = x;
     this.maxAirY = 0;
     this.stompT = 0;
+    this.liftCount = 0;
+    this.settled = false;
     this.events.length = 0;
   }
 
@@ -119,8 +121,16 @@ export class Player {
     const nx = this.x + s * cos * dt;
     const gNext = c.heightAt(nx);
     const ballY = this.y + s * sin * dt - 0.5 * P.G * dt * dt;
-    const curv = c.curvatureAt(this.x);
-    if (gNext === null || gNext < ballY - 0.22 || (curv > 0 && s * s * curv > P.G * cos * 1.08)) {
+    // leave the ground at an edge or a lip, or when a crest falls away faster than gravity
+    // allows — and then only if it lasts (no flicker on gentle rollers)
+    let lift = gNext === null || gNext < ballY - 0.2;
+    if (!lift) {
+      const curv = c.curvatureAt(this.x);
+      if (curv > 0 && s * s * curv > P.G * cos * 1.15) lift = ++this.liftCount >= 4;
+      else this.liftCount = 0;
+    }
+    if (lift) {
+      this.liftCount = 0;
       this.grounded = false;
       this.airTime = 0;
       this.spin = 0;
@@ -132,7 +142,7 @@ export class Player {
     }
     this.x = nx;
     this.y = gNext;
-    this.rot = dampAngle(this.rot, slope, 24, dt);
+    this.rot = dampAngle(this.rot, slope, 18, dt);
     this.angVel = 0;
     if (!c.isGap(nx + 3) && !c.isGap(nx + 9)) this.lastSafeX = nx;
   }
@@ -175,7 +185,7 @@ export class Player {
     if (!want && g !== null) {
       // gentle self-levelling when nearly aligned with the ground below
       const d = wrapPi(c.slopeAt(this.x) - this.rot);
-      if (Math.abs(d) < 0.7) this.rot += d * (1 - Math.exp(-3.5 * dt));
+      if (Math.abs(d) < 0.7) this.rot += d * (1 - Math.exp(-(this.y - g < 0.6 ? 12 : 3.5) * dt));
     }
 
     // rails
@@ -317,6 +327,7 @@ export class Player {
     this.crashed = true;
     this.crashType = type;
     this.crashT = 0;
+    this.settled = false;
     this.rail = null;
     this.boostT = 0;
     this.fulgurT = 0;
@@ -335,22 +346,50 @@ export class Player {
   }
 
   _crashStep(dt) {
-    const c = this.course;
+    const c = this.course, P = PHYS;
     this.crashT += dt;
-    this.vy -= PHYS.G * dt;
+    this.vy -= P.G * dt;
     this.x += this.vx * dt;
     this.y += this.vy * dt;
-    this.rot += this.angVel * dt;
     const g = c.heightAt(this.x);
-    if (g !== null && this.y <= g && this.crashType !== 'fall') {
-      this.y = g;
-      const slope = c.slopeAt(this.x);
-      if (this.vy < -3) {
-        this.vy = -this.vy * 0.28;
-        this.events.push({ type: 'tumble' });
-      } else this.vy = this.vx * Math.tan(slope);
-      this.vx *= Math.exp(-2.6 * dt);
-      this.angVel *= Math.exp(-2.2 * dt);
+    if (g === null || this.crashType === 'fall' || this.y > g) {
+      // in the air (or dropping into a chasm): keep spinning
+      this.rot += this.angVel * dt;
+      if (g === null || this.crashType === 'fall') {
+        this.vx *= Math.exp(-1.4 * dt);
+        this.angVel = damp(this.angVel, 2.5, 2, dt);
+      }
+      return;
+    }
+    const slope = c.slopeAt(this.x), tx = Math.cos(slope), ty = Math.sin(slope);
+    let vt = this.vx * tx + this.vy * ty; // along the slope
+    const vn = -this.vx * ty + this.vy * tx; // into the ground when negative
+    this.y = g;
+    let bounce = 0;
+    if (vn < -2.4) {
+      bounce = -vn * 0.3;
+      this.events.push({ type: 'tumble', power: Math.min(1, -vn / 11) });
+    }
+    // the snow grabs harder and harder: a short slide, then rest
+    vt *= Math.exp(-(1.5 + this.crashT * 1.6) * dt);
+    if (Math.abs(vt) < 0.6 && bounce === 0) vt = 0;
+    this.vx = vt * tx - bounce * ty;
+    this.vy = vt * ty + bounce * tx;
+    if (Math.abs(vt) > 1.6) {
+      // roll with the slide
+      this.angVel = damp(this.angVel, -vt / 0.55, 9, dt);
+      this.rot += this.angVel * dt;
+      this.settled = false;
+    } else {
+      // lie down along the slope, head first
+      let target = slope - Math.PI / 2;
+      target += Math.round((this.rot - target) / TAU) * TAU;
+      this.rot = dampAngle(this.rot, target, 7, dt);
+      this.angVel = 0;
+      if (!this.settled && bounce === 0) {
+        this.settled = true;
+        this.events.push({ type: 'settle' });
+      }
     }
   }
 
@@ -372,6 +411,7 @@ export class Player {
     this.rail = null;
     this.crashed = false;
     this.crashType = '';
+    this.settled = false;
     this.overGap = false;
     this.rot = c.slopeAt(x);
     this.angVel = 0;

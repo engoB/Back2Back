@@ -134,6 +134,7 @@ export class Game {
     this.world.density = this.engine.q.density;
     this.fx = new Fx(this.engine.scene, this.engine.q.particles);
     this.views = new ItemViews(this.engine.scene, this.fx);
+    this._applyHdr();
     this.warp = new Warp(this.engine.scene);
     this.cam = new CameraRig(this.engine.camera);
     this.audio = new AudioEngine();
@@ -189,7 +190,7 @@ export class Game {
   prepare() {
     this.hub.enter();
     this.hub.update(0.016);
-    this.engine.render();
+    this.engine.render(0.016);
   }
 
   /** A new version has been installed by the service worker. */
@@ -226,7 +227,7 @@ export class Game {
       if (this.run.paused) this._idle(dt);
       else this.run.update(dt);
     } else if (this.state === 'cine') this.cinema.update(dt);
-    this.engine.render();
+    this.engine.render(dt);
     this._perf(raw);
   }
 
@@ -258,9 +259,17 @@ export class Game {
     }
   }
 
+  _applyHdr() {
+    const k = this.engine.hdr;
+    this.world.hdr = k;
+    this.views.glowMat.color.setScalar(k > 1 ? 1.6 : 1);
+    document.body.classList.toggle('no-post', !this.engine.post);
+  }
+
   _setQuality(q) {
     this.quality = q;
     this.engine.setQuality(q);
+    this._applyHdr();
     this.world.density = this.engine.q.density;
     this.fx.density = this.engine.q.particles;
   }
@@ -292,9 +301,7 @@ export class Game {
     document.documentElement.lang = s.lang;
     if (qualityChanged) {
       const q = pickQuality();
-      const aa = this.engine.q.antialias;
       this._setQuality(q);
-      if (this.engine.q.antialias !== aa) this.menus.toast(t('opt.reload'));
     }
   }
   canInstall() {

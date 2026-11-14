@@ -163,6 +163,9 @@ export class Run {
     }
     ctx.hud.setMode(this.mode, { length: this.course.length, chapter: opts.chapter, rivals: this.rivals.length });
     ctx.input.reset();
+    this.view = { x: 0, y: 0, rot: 0 };
+    this.rig.groundFn = (x) => this.course.heightAt(x);
+    this._syncPrev();
     this._visuals(0, 0);
   }
 
@@ -215,7 +218,7 @@ export class Run {
     }
     if (this.state === 'crashed') {
       this.crashT += dt;
-      if (this.crashT > (this.mode === 'race' ? 1.3 : 1.7)) this._afterCrash();
+      if (this.crashT > (this.mode === 'race' ? 1.4 : 2.5)) this._afterCrash();
     }
     if (this.state === 'finished') {
       this.finishT += dt;
@@ -224,8 +227,16 @@ export class Run {
     this._visuals(dt, sdt);
   }
 
+  _syncPrev() {
+    const p = this.player;
+    this.prevX = p.x;
+    this.prevY = p.y;
+    this.prevRot = p.rot;
+  }
+
   _step(dt, held, pressed) {
     const p = this.player;
+    this._syncPrev();
     if (this.state === 'playing' || this.state === 'crashed' || this.state === 'finished') {
       const x0 = p.x;
       p.step(dt, held, pressed);
@@ -305,7 +316,7 @@ export class Run {
           A.sfx('land', { power });
           fx.landing(p.x, p.y, era.terrain.fill[0], power);
           this.rig.kickSquash(power);
-          if (e.impact > 9) ctx.cam.addShake(0.18 + power * 0.2);
+          if (e.impact > 12) ctx.cam.addShake(0.1 + power * 0.14);
           if (e.airTime > this.stats.bestAir) this.stats.bestAir = e.airTime;
           if (e.flips > 0) {
             this.stats.flips += e.flips;
@@ -362,7 +373,12 @@ export class Run {
           ctx.haptic([30, 40, 30]);
           break;
         case 'tumble':
-          fx.landing(p.x, p.y, era.terrain.fill[0], 0.5);
+          fx.landing(p.x, p.y, era.terrain.fill[0], 0.35 + e.power * 0.7);
+          A.sfx('land', { power: 0.3 + e.power * 0.6 });
+          ctx.cam.addShake(0.12 + e.power * 0.2);
+          break;
+        case 'settle':
+          fx.landing(p.x, p.y, era.terrain.fill[0], 0.3);
           break;
         case 'crash':
           this._crash(e.cause);
@@ -397,6 +413,7 @@ export class Run {
     const p = this.player, ctx = this.ctx;
     if (this.mode === 'race') {
       p.rescue('back');
+      this._syncPrev();
       this.state = 'playing';
       ctx.fx.resetTrail();
       ctx.audio.sfx('revive');
@@ -426,6 +443,7 @@ export class Run {
     p.rescue(p.crashType === 'fall' || p.crashType === 'wall' ? 'ahead' : 'back');
     p.invulnT = 3;
     p.boostT = 2;
+    this._syncPrev();
     if (this.storm) this.storm.x = p.x - 90;
     this.state = 'playing';
     this.crashT = 0;
@@ -806,53 +824,57 @@ export class Run {
     const p = this.player, ctx = this.ctx, fx = ctx.fx, A = ctx.audio, course = this.course, era = ERAS[this.eraId];
     const engine = ctx.engine;
     const speed = Math.hypot(p.vx, p.vy);
-    const ground = course.solidAt(p.x);
     const warp = this.state === 'warp';
+    // what is drawn is interpolated between the last two physics steps: no stutter
+    const al = this.state === 'warp' || this.paused ? 1 : clamp(this.acc / STEP, 0, 1);
+    const v = this.view;
+    v.x = this.prevX + (v.x - this.prevX) * al;
+    v.y = this.prevY + (v.y - this.prevY) * al;
+    v.rot = this.prevRot + (v.rot - this.prevRot) * al;
+    const ground = course.solidAt(v.x);
 
     // rider
     const rig = this.rig;
-    rig.setTint(ctx.world.tint);
-    rig.root.position.set(p.x, p.y + 0.03, 0);
+    rig.root.position.set(v.x, v.y + 0.03, 0);
     if (warp) {
       rig.tilt.rotation.z = Math.sin(this.time * 2.2) * 0.22 + 0.12;
       rig.tilt.rotation.x = Math.sin(this.time * 1.3) * 0.5;
-      rig.root.position.y = p.y + 1.2 + Math.sin(this.time * 3) * 0.3;
+      rig.root.position.y = v.y + 1.2 + Math.sin(this.time * 3) * 0.3;
       rig.play('boost');
       rig.speedHint = 26;
       rig.update(dt);
     } else {
       rig.tilt.rotation.x = 0;
-      rig.tilt.rotation.z = p.rot;
-      rig.drive(sdt || dt, p, false);
+      rig.tilt.rotation.z = v.rot;
+      rig.drive(sdt || dt, p, { ground, curv: p.grounded ? course.curvatureAt(v.x) : 0 });
     }
     rig.root.visible = !(p.invulnT > 0 && !p.crashed && Math.floor(this.time * 14) % 2 === 0);
 
     // particles / trail
     if (!warp) {
       const boosting = p.boosting && !p.crashed;
-      if (p.grounded && !p.crashed && this.state !== 'countdown') fx.spray(p.x, p.y, speed, era.terrain.fill[0], p.rot);
-      const cs = Math.cos(p.rot), sn = Math.sin(p.rot);
+      if (p.grounded && !p.crashed && this.state !== 'countdown') fx.spray(v.x, v.y, speed, era.terrain.fill[0], v.rot);
+      const cs = Math.cos(v.rot), sn = Math.sin(v.rot);
       const tw = p.crashed ? 0 : this.fulgurOn ? 0.5 : boosting ? 0.34 : 0.1;
-      fx.trailPoint(p.x - cs * 0.75, p.y + 0.06 - sn * 0.75, tw, this.fulgurOn ? 0xfff2a0 : this.trailColor);
+      fx.trailPoint(v.x - cs * 0.75, v.y + 0.06 - sn * 0.75, tw, this.fulgurOn ? 0xfff2a0 : this.trailColor);
       if (this.fulgurOn && !p.crashed) {
-        fx.energy(p.x, p.y, 0xfff2a0, 0.9);
+        fx.energy(v.x, v.y, 0xfff2a0, 0.9);
         if (Math.random() < dt * 5) {
-          fx.bolt({ x: p.x - 2 - Math.random() * 3, y: p.y + 0.2, z: (Math.random() - 0.5) * 2 }, { x: p.x + 0.4, y: p.y + 0.8 + Math.random(), z: 0 }, 0xfff6c0, 0.07, 0.14, 0.3, 0);
+          fx.bolt({ x: v.x - 2 - Math.random() * 3, y: v.y + 0.2, z: (Math.random() - 0.5) * 2 }, { x: v.x + 0.4, y: v.y + 0.8 + Math.random(), z: 0 }, 0xfff6c0, 0.07, 0.14, 0.3, 0);
         }
-      } else if (boosting) fx.energy(p.x, p.y, this.trailColor, 0.5);
-      if (p.shield && Math.random() < dt * 10) fx.glow(p.x, p.y + 0.8, 0.3, 0x5fb0ff, 2.4, 0.3, 0.16);
-      fx.speedLines(dt, p.x, p.y, speed + 20, boosting && speed > 20);
-      fx.setShadow(p.x, ground, course.slopeAt(p.x), Math.max(0, p.y - ground), !p.crashed || p.crashType !== 'fall');
-    } else fx.speedLines(dt, p.x, p.y, 120, true);
+      } else if (boosting) fx.energy(v.x, v.y, this.trailColor, 0.5);
+      if (p.shield && Math.random() < dt * 10) fx.glow(v.x, v.y + 0.8, 0.3, 0x5fb0ff, 2.4, 0.3, 0.16);
+      fx.speedLines(dt, v.x, v.y, speed + 20, boosting && speed > 20);
+      fx.setShadow(v.x, ground, course.slopeAt(v.x), Math.max(0, v.y - ground), !p.crashed || p.crashType !== 'fall');
+    } else fx.speedLines(dt, v.x, v.y, 120, true);
 
     // rivals
     const now = performance.now() / 1000;
     for (const r of this.rivals) {
       const s = r.bot ? r.bot.player : r.net.sample(now);
-      r.rig.setTint(ctx.world.tint);
       r.rig.root.position.set(s.x, s.y + 0.03, r.z);
       r.rig.tilt.rotation.z = s.rot;
-      r.rig.drive(dt, s, false);
+      r.rig.drive(dt, s, null);
       r.sx = s.x; r.sy = s.y;
     }
 
@@ -867,31 +889,31 @@ export class Run {
         const bx = s.x - 4 - Math.random() * 18;
         fx.bolt({ x: bx, y: ground + 34, z: 2 }, { x: bx + (Math.random() - 0.5) * 8, y: course.solidAt(bx) + 0.5, z: (Math.random() - 0.5) * 6 }, 0xd8b8ff, 0.3, 0.26, 0.2, 1);
         if (Math.random() < 0.5) {
-          A.sfx('thunder', { near: clamp(1 - (p.x - s.x) / 90, 0.2, 1) });
+          A.sfx('thunder', { near: clamp(1 - (v.x - s.x) / 90, 0.2, 1) });
           ctx.world.flash = Math.max(ctx.world.flash, 0.5);
         }
       }
-      A.loop('storm', clamp(1 - (p.x - s.x) / 80, 0, 1) * 0.5);
+      A.loop('storm', clamp(1 - (v.x - s.x) / 80, 0, 1) * 0.5);
     }
 
     // camera
     this.fovKick = damp(this.fovKick, p.boosting ? 0.6 : 0, 3, dt);
     if (warp) {
       const t = this.warpT;
-      const cx = p.x - 10 + Math.sin(t * 1.4) * 0.6, cy = p.y + 3 + Math.sin(t * 1.9) * 0.5;
-      ctx.cam.shot(_v.set(cx, cy, 4.5 + Math.sin(t * 0.9) * 1.5), new THREE.Vector3(p.x + 40, p.y + 1.6, 0), 62, Math.sin(t * 1.1) * 0.18);
+      const cx = v.x - 10 + Math.sin(t * 1.4) * 0.6, cy = v.y + 3 + Math.sin(t * 1.9) * 0.5;
+      ctx.cam.shot(_v.set(cx, cy, 4.5 + Math.sin(t * 0.9) * 1.5), new THREE.Vector3(v.x + 40, v.y + 1.6, 0), 62, Math.sin(t * 1.1) * 0.18);
       ctx.cam.apply(dt);
     } else {
-      const fy = Math.max(p.y, ground - 6);
-      ctx.cam.follow(dt, { x: p.x, y: fy, vx: p.vx, vy: p.vy }, ground, engine.aspect, { extra: this.fovKick * 5 + (this.storm ? 6 : 0) });
+      const fy = Math.max(v.y, ground - 6);
+      ctx.cam.follow(dt, { x: v.x, y: fy, vx: p.vx, vy: p.vy }, ground, engine.aspect, { extra: this.fovKick * 5 + (this.storm ? 6 : 0) });
     }
     fx.setViewport(engine.height, engine.camera.fov);
 
     // world & items
     ctx.world.aspect = engine.aspect;
-    ctx.world.update(dt, p.x, p.y);
-    if (!warp) ctx.views.update(dt, p.x, this.collected, p);
-    fx.update(dt, p.x, Math.max(p.y, ground - 6));
+    ctx.world.update(dt, v.x, v.y);
+    if (!warp) ctx.views.update(dt, v.x, this.collected, p);
+    fx.update(dt, v.x, Math.max(v.y, ground - 6));
 
     // audio ambience
     if (this.state === 'playing' || this.state === 'finished') {

@@ -10,6 +10,12 @@ import { RiderRig } from '../game/rider.js';
 import { RIDER_ORDER, BOARD_ORDER } from '../game/catalog.js';
 
 const q = new URLSearchParams(location.search);
+if (q.get('props')) {
+  // contact sheet of every drawing of an era: ?props=west
+  const { showPropSheet } = await import('./propsheet.js');
+  showPropSheet(q.get('props'), document.getElementById('c'));
+  throw new Error('prop sheet mode');
+}
 const engine = new Engine(document.getElementById('c'), q.get('q') || 'high');
 const world = new World(engine.scene);
 const course = new Course({ seed: +(q.get('seed') || 5), ...(q.get('calm') ? { calm: true, allow: {} } : {}) });
@@ -55,9 +61,8 @@ function frame(now) {
   if (!frozen) sim(dt);
   dummy.position.set(player.x, player.y, 0);
   rigR.tilt.rotation.z = player.rot;
-  rigR.setTint(world.tint);
-  rigR.drive(dt, player, false);
-  for (const r of lineup) { r.setTint(world.tint); r.update(dt); }
+  rigR.drive(dt, player, { ground: course.solidAt(player.x), curv: 0 });
+  for (const r of lineup) r.update(dt);
   const ground = course.solidAt(player.x);
   if (lineup.length) {
     const cx = 2 + 2.5 * 1.9;
@@ -66,7 +71,8 @@ function frame(now) {
   } else rig.follow(dt, player, ground, engine.aspect);
   world.aspect = engine.aspect;
   world.update(dt, player.x, player.y);
-  engine.render();
+  world.hdr = engine.hdr;
+  engine.render(dt);
   window.__frames++;
   requestAnimationFrame(frame);
 }

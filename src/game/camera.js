@@ -34,7 +34,7 @@ export class CameraRig {
     const speed = Math.hypot(p.vx, p.vy);
     const air = Math.max(0, p.y - ground);
     const wTarget = lerp(33, 24, portrait) + clamp((speed - 14) * 0.55, 0, 10) + clamp(air * 0.95, 0, 15) + (opts.extra || 0);
-    this.width = this.snap ? wTarget : damp(this.width, wTarget, 2.2, dt);
+    this.width = this.snap ? wTarget : damp(this.width, wTarget, 1.6, dt);
     const hFov = 2 * Math.atan(Math.tan((vFov * DEG) / 2) * aspect);
     const dist = this.width / 2 / Math.tan(hFov / 2);
     const anchor = lerp(0.3, 0.27, portrait);
@@ -45,8 +45,8 @@ export class CameraRig {
     const ty = lerp(p.y, ground, 0.5) + visH * lerp(0.07, 0.11, portrait) + clamp(air * 0.1, 0, 3);
     if (this.snap) this.look.set(tx, ty, 0);
     else {
-      this.look.x = damp(this.look.x, tx, 9, dt);
-      this.look.y = damp(this.look.y, ty, 5.5, dt);
+      this.look.x = damp(this.look.x, tx, 14, dt);
+      this.look.y = damp(this.look.y, ty, 4.2, dt);
       this.look.z = 0;
     }
     const yaw = 0, pitch = lerp(0.045, 0.05, portrait);

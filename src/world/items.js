@@ -211,13 +211,15 @@ export class ItemViews {
     if (!built) return { type: 'rock', group: g };
     if (built.lit) g.add(new THREE.Mesh(built.lit, MAT.lit));
     if (built.glow) g.add(new THREE.Mesh(built.glow, MAT.glow));
-    const bb = (built.lit || built.glow).boundingBox;
+    const bb = new THREE.Box3();
+    if (built.lit) bb.union(built.lit.boundingBox);
+    if (built.glow) bb.union(built.glow.boundingBox);
     const S = ROCK_SIZES[it.size] || ROCK_SIZES[0];
     const sy = (S.h * 1.08) / Math.max(0.2, bb.max.y), sx = (S.hw * 2.1) / Math.max(0.2, bb.max.x - bb.min.x);
     const sc = Math.min(sy, sx * 1.25);
-    g.scale.setScalar(sc);
-    g.rotation.y = (it.id * 1.7) % 1 - 0.5;
-    g.position.set(it.x, it.y - 0.04, 0);
+    // flat drawing standing just behind the rider's plane, mirrored one time out of two
+    g.scale.set(it.id % 2 ? -sc : sc, sc, sc);
+    g.position.set(it.x, it.y - 0.04, -0.35);
     return { type: 'rock', group: g, hover: name === 'drone', baseY: it.y };
   }
 

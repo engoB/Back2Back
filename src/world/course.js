@@ -34,6 +34,7 @@ export class Course {
     this.s3 = this.rng.int(1, 1e6);
     this.ys = []; // surface height per sample (NaN inside chasms)
     this.base = []; // smooth baseline (never NaN)
+    this.brk = []; // 1 when the segment after this sample is a deliberate edge (lip, cliff)
     this.n = 0;
     this.genX = X0; // x of the next sample to generate
     this.baseY = 0;
@@ -86,15 +87,42 @@ export class Course {
     return this.base[i];
   }
 
-  /** Surface height at x, or null over a chasm. */
+  /** Tangent (dy/dx) at sample i; one-sided next to chasms and edges. */
+  _tan(i) {
+    const ys = this.ys, y = ys[i];
+    const l = i > 0 ? ys[i - 1] : NaN, r = i < this.n - 1 ? ys[i + 1] : NaN;
+    const lok = l === l && !this.brk[i - 1], rok = r === r && !this.brk[i];
+    if (lok && rok) return (r - l) / (2 * DX);
+    if (rok) return (r - y) / DX;
+    if (lok) return (y - l) / DX;
+    return 0;
+  }
+
+  /** Surface height at x, or null over a chasm. Smooth (C1) between samples. */
   heightAt(x) {
     const f = (x - X0) / DX;
-    let i = Math.floor(f);
+    const i = Math.floor(f);
     if (i < 0) return this.ys[0];
-    if (i >= this.n - 2) this.ensure(x + 40);
+    if (i >= this.n - 3) this.ensure(x + 40);
     const a = this.ys[i], b = this.ys[i + 1];
     if (a !== a || b !== b) return null;
-    return a + (b - a) * (f - i);
+    const t = f - i;
+    if (this.brk[i]) return a + (b - a) * t;
+    const t2 = t * t, t3 = t2 * t;
+    return (2 * t3 - 3 * t2 + 1) * a + (t3 - 2 * t2 + t) * DX * this._tan(i) + (3 * t2 - 2 * t3) * b + (t3 - t2) * DX * this._tan(i + 1);
+  }
+
+  /** dy/dx of the surface at x (0 over a chasm). */
+  gradAt(x) {
+    const f = (x - X0) / DX;
+    const i = Math.floor(f);
+    if (i < 0) return 0;
+    if (i >= this.n - 3) this.ensure(x + 40);
+    const a = this.ys[i], b = this.ys[i + 1];
+    if (a !== a || b !== b) return 0;
+    if (this.brk[i]) return (b - a) / DX;
+    const t = f - i, t2 = t * t;
+    return ((6 * t2 - 6 * t) * (a - b)) / DX + (3 * t2 - 4 * t + 1) * this._tan(i) + (3 * t2 - 2 * t) * this._tan(i + 1);
   }
 
   /** Smooth baseline (defined everywhere, ignores bumps and chasms). */
@@ -124,19 +152,13 @@ export class Course {
   }
 
   /** Terrain tangent angle (radians, negative when going downhill). */
-  slopeAt(x, span = 0.6) {
-    let a = this.heightAt(x - span), b = this.heightAt(x + span);
-    const c = this.heightAt(x);
-    if (c === null) return 0;
-    if (a === null && b === null) return 0;
-    if (a === null) return Math.atan2(b - c, span);
-    if (b === null) return Math.atan2(c - a, span);
-    return Math.atan2(b - a, span * 2);
+  slopeAt(x) {
+    return Math.atan(this.gradAt(x));
   }
 
-  /** Convex curvature (rad/m, positive when the ground falls away). */
+  /** Convex curvature (rad/m, positive when the ground falls away), averaged over a board length. */
   curvatureAt(x) {
-    return (this.slopeAt(x - 0.7) - this.slopeAt(x + 0.7)) / 1.4;
+    return (this.slopeAt(x - 1.1) - this.slopeAt(x + 1.1)) / 2.2;
   }
 
   isGap(x) {
@@ -161,7 +183,7 @@ export class Course {
   _slopeDeg(x) {
     if (this.cfg.flat) return 1.5 + 1.2 * noise1(x / 60, this.s1);
     const d = this.diffAt(Math.max(0, x));
-    let a = 10.5 + 2.5 * d + 8.5 * noise1(x / 120, this.s1) + 6 * noise1(x / 41, this.s2) + 2 * noise1(x / 13, this.s3);
+    let a = 10.5 + 2.5 * d + 8.5 * noise1(x / 130, this.s1) + 4.6 * noise1(x / 58, this.s2);
     if (this.cfg.calm) a = 7 + 5 * noise1(x / 120, this.s1) + 3 * noise1(x / 41, this.s2);
     if (x < 40) a = lerp(2, a, smoothstep(-30, 40, x));
     return a;
@@ -179,9 +201,11 @@ export class Course {
       const u = x - startX + DX;
       this.ys.push(this.baseY + (bump ? bump(u) : 0));
       this.base.push(this.baseY);
+      this.brk.push(0);
       this.n++;
       this.genX += DX;
     }
+    if (bump && bump(n * DX) > 0.05) this.brk[this.n - 1] = 1;
     return startX;
   }
 
@@ -193,6 +217,7 @@ export class Course {
       this.baseY -= Math.tan(a) * DX + drop / n;
       this.ys.push(NaN);
       this.base.push(this.baseY);
+      this.brk.push(0);
       this.n++;
       this.genX += DX;
     }
@@ -202,6 +227,7 @@ export class Course {
 
   _cliff(h) {
     this.baseY -= h;
+    this.brk[this.n - 1] = 1;
   }
 
   _add(items) {

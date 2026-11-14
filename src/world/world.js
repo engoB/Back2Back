@@ -8,6 +8,8 @@ import { Sky } from './sky.js';
 import { buildTerrainChunk, buildRidgeChunk, buildLayerChunk, makeLayerMaterial, topY, ridgeY } from './terrain.js';
 import { getProp, propVariants } from './props.js';
 import { Kit, MAT } from './meshkit.js';
+import { ENV } from '../game/shade.js';
+import { LAYER } from '../core/post.js';
 import { RNG, hashInt, hashStr } from '../core/rng.js';
 import { lerp, smoothstep, clamp } from '../core/math.js';
 
@@ -20,7 +22,6 @@ const NUM_KEYS = ['midPos', 'fogNear', 'fogFar', 'sunSize', 'glowSize', 'hemiInt
 
 const _m4 = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
-const _e = new THREE.Euler();
 const _v = new THREE.Vector3();
 const _s = new THREE.Vector3();
 const _c = new THREE.Color();
@@ -29,7 +30,7 @@ const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
 
 /** Fixed-capacity instanced prop (tinted + optional glow mesh sharing slots). */
 class PropPool {
-  constructor(parent, built, cap) {
+  constructor(parent, built, cap, layer = 0) {
     this.meshes = [];
     this.cap = cap;
     this.free = [];
@@ -37,6 +38,7 @@ class PropPool {
     const add = (geo, mat) => {
       const m = new THREE.InstancedMesh(geo, mat, cap);
       m.frustumCulled = false;
+      m.layers.set(layer);
       for (let i = 0; i < cap; i++) m.setMatrixAt(i, ZERO);
       parent.add(m);
       this.meshes.push(m);
@@ -126,6 +128,7 @@ export class World {
     this.tint = new THREE.Color(1, 1, 1); // ambient tint applied to every flat shape
     this.flash = 0;
     this.density = 1; // scenery density (graphics quality)
+    this.hdr = 1; // emissive boost when the HDR bloom is active
     this.course = null;
     this.era = null;
     this.focusX = 0;
@@ -162,7 +165,7 @@ export class World {
       const list = [];
       for (let v = 0; v < variants; v++) {
         const built = getProp(sp.prop, v);
-        if (built) list.push(new PropPool(this.gDecor, built, cap));
+        if (built) list.push(new PropPool(this.gDecor, built, cap, onRidge && sp.ridge >= 1 ? LAYER.MID : LAYER.FG));
       }
       this.pools.push({ sp, si, list });
     });
@@ -184,6 +187,7 @@ export class World {
       const sc = rng.range(22, 52);
       mesh.scale.set(sc * rng.range(1, 1.5), sc * 0.6, sc);
       mesh.frustumCulled = false;
+      mesh.layers.set(LAYER.FAR);
       this.gClouds.add(mesh);
       this.clouds.push({ mesh, u: rng.range(-1300, 1300), y: rng.range(90, 260), z: rng.range(-1000, -620), speed: rng.range(1.5, 5) });
     }
@@ -222,13 +226,13 @@ export class World {
   // ---- scenery placement -------------------------------------------------
   _place(rec, sp, list, rng, x, y, z) {
     const sc = rng.range(sp.scale[0], sp.scale[1]);
-    const rot = sp.spin === undefined ? rng.next() * Math.PI * 2 : (rng.next() - 0.5) * 2 * sp.spin;
+    // drawings are flat: variety comes from mirroring them (never from turning them)
+    const flip = rng.next() < 0.5 && sp.spin !== 0 ? -1 : 1;
     const vi = Math.floor(rng.next() * list.length);
-    _e.set(0, rot, 0);
-    _m4.compose(_v.set(x, y, z), _q.setFromEuler(_e), _s.set(sc, sc, sc));
+    _m4.compose(_v.set(x, y, z), _q.identity(), _s.set(sc * flip, sc, sc));
     const slot = list[vi].alloc(_m4);
     if (slot >= 0) rec.slots.push(list[vi], slot);
-    if (sp.anim === 'windmill') this._addAnim(rec, 'windmillFan', x, y + 7.2 * sc, z + 0.55 * sc, sc, rot, 'spinZ', 1.2 + rng.next());
+    if (sp.anim === 'windmill') this._addAnim(rec, 'windmillFan', x, y + 7.24 * sc, z + 0.3 * sc, sc, 'spinZ', 1.2 + rng.next());
   }
 
   _buildChunk(ci) {
@@ -264,6 +268,7 @@ export class World {
     if (geo) {
       rec.mesh = new THREE.Mesh(geo, R.mat);
       rec.mesh.frustumCulled = false;
+      if (R.index >= 1) rec.mesh.layers.set(LAYER.MID);
       R.group.add(rec.mesh);
     }
     for (const { sp, si, list } of this.pools) {
@@ -280,13 +285,12 @@ export class World {
     return rec;
   }
 
-  _addAnim(rec, prop, x, y, z, sc, rot, kind, speed) {
+  _addAnim(rec, prop, x, y, z, sc, kind, speed) {
     const built = getProp(prop, 0);
     if (!built || !built.lit) return;
     const mesh = new THREE.Mesh(built.lit, MAT.lit);
     mesh.position.set(x, y, z);
     mesh.scale.setScalar(sc);
-    mesh.rotation.y = rot;
     this.gAnim.add(mesh);
     const a = { mesh, kind, speed };
     this.anims.push(a);
@@ -380,7 +384,12 @@ export class World {
     if (fl > 0) _c.lerp(_white, fl * 0.6);
     MAT.lit.color.copy(_c);
     MAT.litDouble.color.copy(_c);
-    MAT.glow.color.setScalar(lerp(0.6, 1, m.glow));
+    // characters: same ambient tint, light from the side the sun is on, rim in its colour
+    ENV.tint.value.copy(_c);
+    ENV.rim.value.copy(m.sunGlow);
+    ENV.light.value.set(m.sunPos[0] * 0.9, 0.55, 0.62).normalize();
+    MAT.glow.color.setScalar(lerp(0.6, 1, m.glow) * this.hdr);
+    this.sky.uniforms.uBoost.value = this.hdr > 1 ? 2.2 : 1;
     this.cloudMat.color.copy(m.cloud);
 
     // streaming (at most one new chunk per frame once loaded)
@@ -433,6 +442,7 @@ export class World {
         if (geo) {
           mesh = new THREE.Mesh(geo, L.mat);
           mesh.frustumCulled = false;
+          mesh.layers.set(LAYER.FAR);
           mesh.renderOrder = -900 + L.index;
           L.group.add(mesh);
         }

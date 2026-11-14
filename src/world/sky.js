@@ -1,6 +1,7 @@
 // Full-screen procedural sky: three-stop gradient, sun/moon with halo, stars,
 // a striped retro sun for the neon era and a nebula for the end of time.
 import * as THREE from 'three';
+import { LAYER } from '../core/post.js';
 
 const VERT = /* glsl */ `
 varying vec2 vUv;
@@ -13,7 +14,7 @@ const FRAG = /* glsl */ `
 precision highp float;
 uniform vec3 uTop, uMid, uBot, uSun, uGlow;
 uniform vec2 uSunPos;
-uniform float uSunSize, uGlowSize, uStars, uTime, uAspect, uMidPos, uStyle, uScroll, uFlash, uHorizon;
+uniform float uSunSize, uGlowSize, uStars, uTime, uAspect, uMidPos, uStyle, uScroll, uFlash, uHorizon, uBoost;
 varying vec2 vUv;
 
 float hash(vec2 p) {
@@ -77,7 +78,7 @@ void main() {
     float cut = step(ny, 0.2) * step(band, 0.14 + 0.38 * (0.2 - ny));
     disc *= 1.0 - cut;
   }
-  col = mix(col, sunCol, disc);
+  col = mix(col, sunCol * uBoost, disc);
   col += uFlash;
   gl_FragColor = vec4(col, 1.0);
 }`;
@@ -90,7 +91,7 @@ export class Sky {
       uSunPos: { value: new THREE.Vector2(0.4, 0.4) },
       uSunSize: { value: 0.1 }, uGlowSize: { value: 0.5 }, uStars: { value: 0 }, uTime: { value: 0 },
       uAspect: { value: 1 }, uMidPos: { value: 0.4 }, uStyle: { value: 0 }, uScroll: { value: 0 },
-      uFlash: { value: 0 }, uHorizon: { value: 0 },
+      uFlash: { value: 0 }, uHorizon: { value: 0 }, uBoost: { value: 1 },
     };
     const mat = new THREE.ShaderMaterial({
       uniforms: this.uniforms, vertexShader: VERT, fragmentShader: FRAG, depthTest: false, depthWrite: false,
@@ -98,6 +99,7 @@ export class Sky {
     this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = -1000;
+    this.mesh.layers.set(LAYER.SKY);
   }
 
   /** `m` is a blended mood (THREE.Color fields + numbers). */
