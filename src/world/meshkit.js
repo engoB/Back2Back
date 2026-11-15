@@ -3,6 +3,7 @@
 // draw calls. Nothing is lit: shapes are tinted by the mood of the sky.
 import * as THREE from 'three';
 import { mulberry32 } from '../core/rng.js';
+import { hazed } from '../core/haze.js';
 
 const _m = new THREE.Matrix4();
 const _m2 = new THREE.Matrix4();
@@ -194,11 +195,11 @@ function makeGear(R, teeth, thick, hole) {
 
 // Shared materials --------------------------------------------------------
 export const MAT = {
-  // "lit" = tinted by the ambient mood (set every frame by the World); flat, no shading
-  // (double sided: flat drawings are mirrored through their instance matrix)
-  lit: new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }),
-  litDouble: new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }),
-  glow: new THREE.MeshBasicMaterial({ vertexColors: true, fog: true, side: THREE.DoubleSide }),
+  // "lit" = tinted by the ambient mood (set every frame by the World); flat, no shading.
+  // Double sided: flat drawings are mirrored through their instance matrix.
+  lit: hazed(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })),
+  litDouble: hazed(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })),
+  glow: hazed(new THREE.MeshBasicMaterial({ vertexColors: true, fog: true, side: THREE.DoubleSide })),
   glowAdd: new THREE.MeshBasicMaterial({
     vertexColors: true, fog: false, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
   }),

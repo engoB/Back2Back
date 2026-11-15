@@ -209,7 +209,8 @@ export class Player {
 
     if (g === null) {
       this.overGap = true;
-      if (this.y < c.baseAt(this.x) - 24) this.crash('fall');
+      // below the rim there is no way back: the fall starts right away
+      if (this.y < c.baseAt(this.x) - 1.4) this.crash('fall');
       return;
     }
     if (this.overGap) {
@@ -371,7 +372,7 @@ export class Player {
       this.events.push({ type: 'tumble', power: Math.min(1, -vn / 11) });
     }
     // the snow grabs harder and harder: a short slide, then rest
-    vt *= Math.exp(-(1.5 + this.crashT * 1.6) * dt);
+    vt *= Math.exp(-(2.2 + this.crashT * 2.6) * dt);
     if (Math.abs(vt) < 0.6 && bounce === 0) vt = 0;
     this.vx = vt * tx - bounce * ty;
     this.vy = vt * ty + bounce * tx;

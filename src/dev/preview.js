@@ -61,7 +61,7 @@ function frame(now) {
   if (!frozen) sim(dt);
   dummy.position.set(player.x, player.y, 0);
   rigR.tilt.rotation.z = player.rot;
-  rigR.drive(dt, player, { ground: course.solidAt(player.x), curv: 0 });
+  rigR.drive(dt, player, { ground: course.solidAt(player.x), curv: 0, slope: course.slopeAt(player.x) });
   for (const r of lineup) r.update(dt);
   const ground = course.solidAt(player.x);
   if (lineup.length) {

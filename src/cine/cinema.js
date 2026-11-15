@@ -281,7 +281,6 @@ const SCENES = {
     const y = C.stage('present', 2, 'storm');
     const tx = 0, ty = y(tx) - 2;
     const tower = C.add(makeClockTower(), tx, ty, -7);
-    tower.rotation.y = 0.12;
     const face = { x: tx, y: ty + 22.1, z: -3.6 };
     let clockT = 23 + 59 / 60, spin = 0;
     C.tick((dt) => {
@@ -449,7 +448,7 @@ const SCENES = {
     let y = C.stage('void', 1, 'timedust');
     const nova = C.actor('nova', save_board(), -6, 'ride', 1);
     nova.turn = 0;
-    owlNear(C, nova, -1.1, 2.1);
+    const owl1 = owlNear(C, nova, -1.1, 2.1);
     const glider = C.add(makeGlider(), 9, y(9) + 4.2, 0);
     glider.rotation.y = Math.PI;
     const baron = C.actor('baron', 'paradoxe', 9, 'menace', -1);
@@ -503,6 +502,7 @@ const SCENES = {
       baron.rig.root.visible = false;
       glider.visible = false;
       hand.visible = false;
+      owl1.visible = false;
       fx.resetTrail();
       y = C.stage('present', 2, 'snow');
       g.world.moodSpeed = 0;
@@ -510,7 +510,6 @@ const SCENES = {
       g.audio.music.play('victory', 2.5);
       const ty = y(0) - 2;
       tower = C.add(makeClockTower(), 0, ty, -7);
-      tower.rotation.y = 0.12;
       tower.setTime(clockT);
       for (let i = 0; i < 6; i++) {
         const a = (i / 6) * TAU;

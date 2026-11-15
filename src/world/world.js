@@ -10,8 +10,9 @@ import { getProp, propVariants } from './props.js';
 import { Kit, MAT } from './meshkit.js';
 import { ENV } from '../game/shade.js';
 import { LAYER } from '../core/post.js';
+import { HAZE, hazeAt } from '../core/haze.js';
 import { RNG, hashInt, hashStr } from '../core/rng.js';
-import { lerp, smoothstep, clamp } from '../core/math.js';
+import { lerp, smoothstep } from '../core/math.js';
 
 const TCH = 40; // track chunk length (m)
 const RCH = 120; // ridge chunk length
@@ -279,7 +280,13 @@ export class World {
       for (let k = 0; k < n; k++) {
         const x = x0 + rng.next() * RCH;
         const y = ridgeY(def, this.course, x, R.seed) - 0.35;
-        this._place(rec, sp, list, rng, x, y, def.z - 0.4 - rng.next() * 2.5);
+        const z = def.z - 0.4 - rng.next() * 2.5;
+        // buildings only stand where the crest shows above the track (never half-buried)
+        if (sp.clear && y < topY(this.course, x) + 0.6) {
+          rng.next(); rng.next(); rng.next();
+          continue;
+        }
+        this._place(rec, sp, list, rng, x, y, z);
       }
     }
     return rec;
@@ -378,17 +385,22 @@ export class World {
     const fog = this.scene.fog;
     fog.color.copy(m.fog);
     if (fl > 0) fog.color.lerp(_white, fl * 0.5);
-    fog.near = m.fogNear;
-    fog.far = m.fogFar;
+    // haze is driven by the depth behind the plane of play (see core/haze.js); the built-in
+    // distance fog only remains for the few unpatched materials and stays out of the way
+    fog.near = 90;
+    fog.far = 520;
+    HAZE.uHazeL.value = (89 * (m.fogFar - m.fogNear)) / 260;
     _c.copy(this.tint);
     if (fl > 0) _c.lerp(_white, fl * 0.6);
     MAT.lit.color.copy(_c);
     MAT.litDouble.color.copy(_c);
     // characters: same ambient tint, light from the side the sun is on, rim in its colour
-    ENV.tint.value.copy(_c);
+    // "hero light": people never sink as deep into the dusk as the landscape does
+    ENV.tint.value.copy(_c).lerp(_white, 0.34);
     ENV.rim.value.copy(m.sunGlow);
     ENV.light.value.set(m.sunPos[0] * 0.9, 0.55, 0.62).normalize();
-    MAT.glow.color.setScalar(lerp(0.6, 1, m.glow) * this.hdr);
+    // emissive parts only burn into the bloom when the mood is dark enough
+    MAT.glow.color.setScalar(lerp(0.6, 1, m.glow) * lerp(1, this.hdr, m.glow));
     this.sky.uniforms.uBoost.value = this.hdr > 1 ? 2.2 : 1;
     this.cloudMat.color.copy(m.cloud);
 
@@ -402,10 +414,9 @@ export class World {
     for (const p of this.pools) for (const pool of p.list) pool.flush();
 
     // ridge colours: flat tone, tinted by the mood and melted into the haze with depth
-    const span = Math.max(1, fog.far - fog.near);
     for (const R of this.ridges) {
       const d = R.def, U = R.mat.uniforms;
-      const f = clamp((CAM_DIST - d.z - fog.near) / span, 0, 1);
+      const f = hazeAt(-d.z);
       U.uColor.value.copy(R.base).multiply(_c).lerp(fog.color, f);
       U.uLow.value.copy(U.uColor.value).lerp(fog.color, 0.42);
       U.uWinAmt.value = d.windows !== undefined ? m.glow * m.glow : 0;

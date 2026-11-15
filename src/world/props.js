@@ -311,7 +311,7 @@ export const PROPS = {
     a.rrect(-5.2, -0.3, 10.4, 3.1, 1.3, 0xdfe6ee, { c2: 0xffffff });
     a.rect(-5.2, 0.5, 10.4, 0.34, 0xff5a7a);
     a.rect(-5.2, 0.2, 10.4, 0.1, 0xb8c2cc);
-    a.rrect(-4.2, 1.2, 8.4, 1.0, 0.3, 0x9ff0f8, { glow: true, c2: 0xdffcff });
+    a.rrect(-4.2, 1.2, 8.4, 1.0, 0.3, 0x58b8c8, { glow: true, c2: 0x9fe6ee });
     for (let i = 1; i < 7; i++) a.rect(-4.2 + i * 1.2, 1.2, 0.07, 1.0, 0xdfe6ee);
     a.rrect(-5.5, 2.7, 11, 0.36, 0.18, 0xc0cad4, { c2: 0xe8eef4 });
     a.rrect(-1.9, 3.2, 3.8, 1.2, 0.2, 0xff5a7a, { glow: true, c2: 0xff8fa8 });
@@ -497,11 +497,16 @@ export const PROPS = {
   },
   holoSign(a, R) {
     a.stroke([0, -0.3, 0, 1.5], 0.16, 0.08, 0xd8e2ec);
-    const c = [0x3fe8d0, 0xff8ad8, 0xfff0b0][Math.floor(R() * 3)];
-    a.rrect(-1.4, 1.7, 2.8, 1.6, 0.12, c, { glow: true, c2: 0xffffff });
-    a.rrect(-1.1, 2.8, 1.7, 0.16, 0.06, 0xffffff, { glow: true });
-    a.rrect(-1.1, 2.45, 1.1, 0.16, 0.06, 0xffffff, { glow: true });
-    a.circle(0.9, 2.2, 0.24, 0xffffff, { glow: true });
+    const c = [0x3fe8d0, 0xff8ad8, 0xffd27a][Math.floor(R() * 3)];
+    // a dark glass pane: only the frame and the "writing" emit light
+    a.rrect(-1.4, 1.7, 2.8, 1.6, 0.14, 0x1c3550, { c2: 0x35607e });
+    a.rrect(-1.4, 3.22, 2.8, 0.08, 0.04, c, { glow: true });
+    a.rrect(-1.4, 1.7, 2.8, 0.08, 0.04, c, { glow: true });
+    a.rrect(-1.1, 2.8, 1.7, 0.14, 0.06, c, { glow: true });
+    a.rrect(-1.1, 2.45, 1.1, 0.14, 0.06, 0xe8f6ff, { glow: true });
+    a.rrect(-1.1, 2.1, 1.4, 0.14, 0.06, 0xe8f6ff, { glow: true });
+    a.circle(0.9, 2.3, 0.26, c, { glow: true });
+    a.circle(0.9, 2.3, 0.15, 0x1c3550);
   },
   antenna(a) {
     a.stroke([0, -0.3, 0, 5.6], 0.16, 0.04, 0xd8e2ec, { c2: 0xffffff });

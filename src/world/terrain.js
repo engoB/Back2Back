@@ -200,11 +200,12 @@ function stripGeometry(pos, rid) {
 }
 
 function islands(def, u0, u1, seed, H, yOf, pos, rid) {
-  const P = 240;
+  // floating rocks: one every P metres at most, flat-topped with a ragged keel
+  const P = def.every || 240, W0 = def.isle ? def.isle[0] : 50, W1 = def.isle ? def.isle[1] : 200;
   for (let k = Math.ceil(u0 / P - 1e-6); k * P < u1 - 1e-6; k++) {
     const r1 = rand2(k, 1, seed), r2 = rand2(k, 2, seed), r3 = rand2(k, 3, seed), r4 = rand2(k, 4, seed), r5 = rand2(k, 5, seed);
     if (r1 < 0.18) continue;
-    const cu = k * P + r2 * P * 0.6, w = 50 + 150 * r3, top = yOf(cu) + H * (0.1 + 0.85 * r4), depth = w * (0.35 + 0.35 * r5);
+    const cu = k * P + r2 * P * 0.6, w = W0 + (W1 - W0) * r3, top = yOf(cu) + H * (0.1 + 0.85 * r4), depth = w * (0.35 + 0.35 * r5);
     const n = 18;
     let prev = null;
     for (let q = 0; q <= n; q++) {

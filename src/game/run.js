@@ -218,7 +218,8 @@ export class Run {
     }
     if (this.state === 'crashed') {
       this.crashT += dt;
-      if (this.crashT > (this.mode === 'race' ? 1.4 : 2.5)) this._afterCrash();
+      const wait = this.mode === 'race' ? 1.4 : this.player.crashType === 'fall' ? 1.6 : 2.4;
+      if (this.crashT > wait) this._afterCrash();
     }
     if (this.state === 'finished') {
       this.finishT += dt;
@@ -828,9 +829,17 @@ export class Run {
     // what is drawn is interpolated between the last two physics steps: no stutter
     const al = this.state === 'warp' || this.paused ? 1 : clamp(this.acc / STEP, 0, 1);
     const v = this.view;
-    v.x = this.prevX + (v.x - this.prevX) * al;
-    v.y = this.prevY + (v.y - this.prevY) * al;
-    v.rot = this.prevRot + (v.rot - this.prevRot) * al;
+    if (Math.abs(p.x - this.prevX) > 3 || Math.abs(p.y - this.prevY) > 3) {
+      // teleport (rescue, time jump): nothing to interpolate
+      v.x = p.x; v.y = p.y; v.rot = p.rot;
+    } else {
+      v.x = this.prevX + (p.x - this.prevX) * al;
+      v.y = this.prevY + (p.y - this.prevY) * al;
+      // shortest arc: a landing folds whole turns back into the slope angle
+      let dr = p.rot - this.prevRot;
+      dr = Math.atan2(Math.sin(dr), Math.cos(dr));
+      v.rot = this.prevRot + dr * al;
+    }
     const ground = course.solidAt(v.x);
 
     // rider
@@ -846,7 +855,7 @@ export class Run {
     } else {
       rig.tilt.rotation.x = 0;
       rig.tilt.rotation.z = v.rot;
-      rig.drive(sdt || dt, p, { ground, curv: p.grounded ? course.curvatureAt(v.x) : 0 });
+      rig.drive(sdt || dt, p, { ground, curv: p.grounded ? course.curvatureAt(v.x) : 0, slope: course.slopeAt(v.x) });
     }
     rig.root.visible = !(p.invulnT > 0 && !p.crashed && Math.floor(this.time * 14) % 2 === 0);
 
@@ -874,7 +883,7 @@ export class Run {
       const s = r.bot ? r.bot.player : r.net.sample(now);
       r.rig.root.position.set(s.x, s.y + 0.03, r.z);
       r.rig.tilt.rotation.z = s.rot;
-      r.rig.drive(dt, s, null);
+      r.rig.drive(dt, s, { ground: course.solidAt(s.x), curv: 0, slope: course.slopeAt(s.x) });
       r.sx = s.x; r.sy = s.y;
     }
 

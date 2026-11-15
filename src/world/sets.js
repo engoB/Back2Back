@@ -2,6 +2,7 @@
 // clockwork owl, the Baron's glider, story cogs and sky rifts.
 import * as THREE from 'three';
 import { Kit, MAT } from './meshkit.js';
+import { Art } from './art.js';
 import { TAU } from '../core/math.js';
 
 const PI = Math.PI;
@@ -12,84 +13,116 @@ const group = (built, glowMat) => {
   return g;
 };
 
-/** The Great Clock. Returns a group with .hands = { hour, minute } and .face (glow material). */
+/**
+ * The Great Clock of Meridian, drawn like the rest of the scenery: a front-facing
+ * illustration (39.5 m tall, dial centred 22.1 m above its foot) with moving hands
+ * and gears. group.setTime(hours) sets the displayed time.
+ */
 export function makeClockTower() {
-  const k = new Kit(41);
-  const stone = 0x8f96a6, stone2 = 0xb4bccb, slate = 0x39425c, brass = 0xc89a4a, snow = 0xf3f8fd;
-  // base
-  k.box(8, 1, 8, { c: 0x6f7688 });
-  k.box(7, 5, 7, { c: stone, c2: stone2, p: [0, 1, 0] });
-  k.box(1.8, 3, 0.3, { c: 0x3f2a1e, p: [0, 1, 3.5] });
-  k.cyl(0.9, 0.9, 0.3, 10, { c: 0x3f2a1e, p: [0, 4, 3.5], r: [PI / 2, 0, 0], mid: true });
-  k.box(7.6, 0.5, 7.6, { c: stone2, p: [0, 6, 0] });
-  k.box(7.9, 0.2, 7.9, { c: snow, p: [0, 6.5, 0], j: 0.02 });
-  // shaft
-  k.box(5, 12, 5, { c: stone, c2: stone2, p: [0, 6.5, 0] });
-  for (const [x, z] of [[-2.5, 2.5], [2.5, 2.5], [-2.5, -2.5], [2.5, -2.5]]) k.box(0.7, 12, 0.7, { c: stone2, p: [x, 6.5, z] });
-  for (const y of [9, 12.5, 16]) {
-    k.box(0.9, 1.5, 0.12, { c: 0xffd98a, glow: true, p: [0, y, 2.52] });
-    k.box(0.12, 1.5, 0.9, { c: 0xffd98a, glow: true, p: [2.52, y, 0] });
-    k.box(0.12, 1.5, 0.9, { c: 0xffd98a, glow: true, p: [-2.52, y, 0] });
+  const a = new Art(41);
+  const stone = 0x8a91a3, stone2 = 0xb6bece, trim = 0xa3aabb, shade = 0x6b7286, slate = 0x343d58, slate2 = 0x566290;
+  const brass = 0xc89a4a, brass2 = 0xecc878, snow = 0xf3f8fd, warm = 0xffd98a, dark = 0x2a2440;
+  const arch = (x, y, w, h, c, o) => a.fill(`M ${x - w} ${y} L ${x - w} ${y + h - w} Q ${x - w} ${y + h} ${x} ${y + h} Q ${x + w} ${y + h} ${x + w} ${y + h - w} L ${x + w} ${y} Z`, c, o);
+  // plinth, steps
+  a.rect(-4.7, -2.5, 9.4, 3.1, shade, { c2: 0x7d8496 });
+  a.rect(-4.25, 0.6, 8.5, 0.5, 0x7d8496);
+  // base block with corner stones and the door
+  a.rect(-3.6, 1.1, 7.2, 5.2, stone, { c2: stone2 });
+  for (let i = 0; i < 6; i++) {
+    const w = 0.7 + (i % 2) * 0.35;
+    a.rect(-3.6, 1.2 + i * 0.86, w, 0.62, trim);
+    a.rect(3.6 - w, 1.2 + i * 0.86, w, 0.62, trim);
   }
-  k.box(6.2, 0.6, 6.2, { c: stone2, p: [0, 18.5, 0] });
-  k.box(6.5, 0.2, 6.5, { c: snow, p: [0, 19.1, 0], j: 0.02 });
+  arch(0, 1.1, 1.05, 3.7, 0x5d6474);
+  arch(0, 1.1, 0.82, 3.45, 0x3f2a1e, { c2: 0x5e402c });
+  a.rect(-0.03, 1.1, 0.06, 3.3, 0x2a1a12);
+  a.circle(0.3, 2.6, 0.07, brass2);
+  for (const x of [-2.3, 2.3]) {
+    arch(x, 2.2, 0.5, 2.0, 0x5d6474);
+    arch(x, 2.32, 0.36, 1.76, warm, { glow: true, c2: 0xfff3c8 });
+    a.rect(x - 0.025, 2.32, 0.05, 1.7, 0x5d6474);
+  }
+  a.circle(0, 5.45, 0.2, warm, { glow: true });
+  a.rect(-3.95, 6.3, 7.9, 0.5, stone2);
+  a.rrect(-4.05, 6.74, 8.1, 0.24, 0.11, snow);
+  // shaft: slightly tapered, pilasters, string courses, three lit windows
+  a.fill('M -2.65 7.0 L -2.45 18.7 L 2.45 18.7 L 2.65 7.0 Z', stone, { c2: stone2 });
+  a.fill('M -2.65 7.0 L -2.45 18.7 L -1.95 18.7 L -2.12 7.0 Z', trim);
+  a.fill('M 2.65 7.0 L 2.45 18.7 L 1.95 18.7 L 2.12 7.0 Z', trim);
+  for (const y of [10.85, 14.55]) a.rect(-2.55, y, 5.1, 0.2, trim);
+  for (const y of [8.1, 11.8, 15.5]) {
+    arch(0, y, 0.58, 2.2, 0x5d6474);
+    arch(0, y + 0.12, 0.42, 1.94, warm, { glow: true, c2: 0xfff3c8 });
+    a.rect(-0.03, y + 0.12, 0.06, 1.9, 0x5d6474);
+    a.rect(-0.42, y + 1.0, 0.84, 0.06, 0x5d6474);
+    a.rrect(-0.74, y - 0.15, 1.48, 0.17, 0.07, snow);
+  }
+  // corbelled cornice under the clock stage
+  a.fill('M -2.45 18.7 L -3.35 19.45 L 3.35 19.45 L 2.45 18.7 Z', trim);
+  a.rrect(-3.5, 19.4, 7.0, 0.24, 0.11, snow);
   // clock stage
-  k.box(6, 6, 6, { c: 0x7c8496, c2: 0xa5adbd, p: [0, 19.1, 0] });
-  const faces = [[0, 0, 3.02, 0], [3.02, 0, 0, PI / 2], [-3.02, 0, 0, -PI / 2]];
-  for (const [x, , z, ry] of faces) {
-    const side = ry !== 0, sx = Math.sign(x);
-    k.cyl(2.45, 2.45, 0.16, 28, { c: 0xfff6dc, glow: true, p: [x, 22.1, z], r: side ? [0, 0, PI / 2] : [PI / 2, 0, 0], mid: true, j: 0 });
-    k.torus(2.5, 0.2, 5, 28, { c: brass, p: [x, 22.1, z], r: [0, ry, 0] });
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * TAU, r = 2.05;
-      const tx = Math.cos(a) * r, ty = Math.sin(a) * r;
-      const big = i % 3 === 0;
-      const px = side ? x + sx * 0.1 : x + tx;
-      const pz = side ? z - sx * tx : z + 0.1;
-      k.box(big ? 0.16 : 0.09, big ? 0.5 : 0.3, 0.05, { c: 0x2a2440, p: [px, 22.1 + ty, pz], r: [0, ry, a - PI / 2], mid: true });
-    }
+  a.rect(-3.15, 19.6, 6.3, 5.2, 0x79819a, { c2: 0xa8b0c2 });
+  a.rect(-3.15, 19.6, 0.5, 5.2, 0x959db0);
+  a.rect(2.65, 19.6, 0.5, 5.2, 0x959db0);
+  a.circle(0, 22.1, 2.68, brass, { c2: brass2, seg: 56 });
+  a.circle(0, 22.1, 2.4, 0x8a6a30, { seg: 56 });
+  a.circle(0, 22.1, 2.3, 0xfff6dc, { glow: true, seg: 56 });
+  for (let i = 0; i < 60; i++) {
+    const ang = (i / 60) * TAU, big = i % 5 === 0, r0 = big ? 1.78 : 2.02, r1 = 2.16, w = big ? 0.12 : 0.035;
+    if (!big && i % 5 !== 0 && i % 1 !== 0) continue;
+    a.stroke([Math.cos(ang) * r0, 22.1 + Math.sin(ang) * r0, Math.cos(ang) * r1, 22.1 + Math.sin(ang) * r1], w, w, dark);
   }
-  k.box(6.6, 0.5, 6.6, { c: stone2, p: [0, 25.1, 0] });
-  // belfry
-  for (const [x, z] of [[-2.6, 2.6], [2.6, 2.6], [-2.6, -2.6], [2.6, -2.6]]) k.cyl(0.3, 0.36, 3, 6, { c: stone2, p: [x, 25.6, z] });
-  k.cyl(1.0, 1.25, 1.5, 8, { c: brass, c2: 0xe8c070, p: [0, 26.2, 0] });
-  k.box(6.6, 0.4, 6.6, { c: stone2, p: [0, 28.6, 0] });
-  k.cone(4.9, 7, 4, { c: slate, c2: 0x55608a, p: [0, 29, 0], r: [0, PI / 4, 0] });
-  k.cone(3.1, 4.5, 4, { c: snow, p: [0, 31.9, 0], r: [0, PI / 4, 0], j: 0.02 });
-  k.cyl(0.07, 0.1, 3.6, 5, { c: brass, p: [0, 35.8, 0] });
-  k.ball(0.38, 1, { c: 0xffd98a, glow: true, p: [0, 39.5, 0] });
-  // exposed gears on the flank
-  k.gear(1.5, 12, 0.3, { c: brass, c2: 0xe8c070, p: [-2.9, 15, 2.2], r: [0, -PI / 2, 0.3] });
-  k.gear(0.9, 9, 0.3, { c: 0x9aa4b8, p: [-2.9, 13, 0.6], r: [0, -PI / 2, 0.1] });
+  // cornice, belfry with its bell, eaves
+  a.fill('M -3.15 24.8 L -3.55 25.35 L 3.55 25.35 L 3.15 24.8 Z', trim);
+  a.rect(-3.05, 25.35, 6.1, 3.1, 0x424a62, { c2: 0x565f7c });
+  a.fill('M -0.95 25.9 Q -0.86 27.3 -0.36 27.65 L 0.36 27.65 Q 0.86 27.3 0.95 25.9 Z', brass, { c2: brass2 });
+  a.circle(0, 25.86, 0.17, 0x8a6a30);
+  a.rect(-0.05, 27.6, 0.1, 0.85, 0x8a6a30);
+  for (const x of [-3.05, -1.25, 0.95, 2.75]) a.rect(x, 25.35, 0.3, 3.1, stone2, { c2: 0xcfd6e2 });
+  for (const x of [-2.0, 0, 2.0]) a.fill(`M ${x - 0.78} 28.45 L ${x - 0.78} 28.0 Q ${x} 27.3 ${x + 0.78} 28.0 L ${x + 0.78} 28.45 Z`, stone2);
+  a.rect(-3.4, 28.45, 6.8, 0.45, stone2);
+  // spire: slate with snow on the windward side, a lit dormer, the finial and its lamp
+  a.fill('M -3.7 28.9 Q -1.5 31.4 -0.5 34.9 L 0 37.3 L 0.5 34.9 Q 1.5 31.4 3.7 28.9 Z', slate, { c2: slate2 });
+  a.fill('M -3.7 28.9 Q -1.5 31.4 -0.5 34.9 L 0 37.3 L -0.08 35.3 Q -0.9 32.3 -2.2 30.5 Q -2.8 30.0 -3.7 28.9 Z', snow, { c2: 0xffffff });
+  a.rrect(-3.85, 28.8, 7.7, 0.27, 0.12, snow);
+  a.fill('M -0.55 30.0 L -0.55 31.1 L 0 31.8 L 0.55 31.1 L 0.55 30.0 Z', 0x2a3048);
+  a.fill('M -0.33 30.15 L -0.33 31.0 L 0 31.42 L 0.33 31.0 L 0.33 30.15 Z', warm, { glow: true });
+  a.rect(-0.05, 37.1, 0.1, 2.1, brass);
+  a.circle(0, 39.5, 0.38, warm, { glow: true });
+  a.circle(0, 38.2, 0.16, brass2);
 
-  const g = group(k.build());
-  const hands = { list: [] };
-  const handMat = new THREE.MeshBasicMaterial({ color: 0x1c1830 });
-  const mkHands = (x, z, ry) => {
-    const pivot = new THREE.Group();
-    pivot.position.set(x, 22.1, z);
-    pivot.rotation.y = ry;
-    const hour = new THREE.Mesh(new THREE.BoxGeometry(0.24, 1.35, 0.08), handMat);
-    hour.geometry.translate(0, 0.55, 0.16);
-    const minute = new THREE.Mesh(new THREE.BoxGeometry(0.15, 2.0, 0.08), handMat);
-    minute.geometry.translate(0, 0.85, 0.24);
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.3, 10), new THREE.MeshBasicMaterial({ color: 0xc89a4a }));
-    hub.rotation.x = PI / 2;
-    hub.position.z = 0.2;
-    pivot.add(hour, minute, hub);
-    g.add(pivot);
-    hands.list.push({ hour, minute });
+  const g = group(a.build());
+  // exposed gears on the flank, turning behind the shaft
+  const gearOf = (R, teeth, c, c2, x, y) => {
+    const ga = new Art(7);
+    ga.gear(0, 0, R, teeth, c, { c2, hole: 0.3, holeColor: 0x4a5268 });
+    const m = new THREE.Mesh(ga.build().lit, MAT.lit);
+    m.position.set(x, y, -0.06);
+    g.add(m);
+    return m;
   };
-  mkHands(0, 3.02, 0);
-  mkHands(3.02, 0, PI / 2);
-  mkHands(-3.02, 0, -PI / 2);
+  const gears = [gearOf(1.55, 12, brass, brass2, -2.75, 15.1), gearOf(0.95, 9, 0x9aa4b8, 0xc4ccdc, -2.95, 12.65)];
+  // hands
+  const handMat = new THREE.MeshBasicMaterial({ color: 0x1c1830, fog: false });
+  const pivot = new THREE.Group();
+  pivot.position.set(0, 22.1, 0.9);
+  const hour = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 1.4), handMat);
+  hour.geometry.translate(0, 0.52, 0);
+  const minute = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 2.05), handMat);
+  minute.geometry.translate(0, 0.86, 0.02);
+  const hub = new THREE.Mesh(new THREE.CircleGeometry(0.2, 20), new THREE.MeshBasicMaterial({ color: 0xc89a4a, fog: false }));
+  hub.position.z = 0.04;
+  pivot.add(hour, minute, hub);
+  g.add(pivot);
   /** Set the displayed time (hours as a float, e.g. 23.98). */
   g.setTime = (h) => {
-    for (const hd of hands.list) {
-      hd.hour.rotation.z = -((h % 12) / 12) * TAU;
-      hd.minute.rotation.z = -(h % 1) * TAU;
-    }
+    hour.rotation.z = -((h % 12) / 12) * TAU;
+    minute.rotation.z = -(h % 1) * TAU;
+    gears[0].rotation.z = h * 26;
+    gears[1].rotation.z = -h * 26 * (12 / 9) + 0.2;
   };
+  /** Render the whole tower in a given post-processing layer (see core/post.js). */
+  g.setLayer = (layer) => g.traverse((o) => o.layers.set(layer));
   g.setTime(23 + 59 / 60);
   return g;
 }

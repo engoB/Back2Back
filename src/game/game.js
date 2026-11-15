@@ -10,6 +10,8 @@ import { ItemViews } from '../world/items.js';
 import { Course, COURSE_PRESETS } from '../world/course.js';
 import { ERAS, ERA_ORDER } from '../world/eras.js';
 import { makeClockTower } from '../world/sets.js';
+import { ridgeY } from '../world/terrain.js';
+import { LAYER } from '../core/post.js';
 import { Fx } from './vfx.js';
 import { Warp } from './warp.js';
 import { CameraRig } from './camera.js';
@@ -65,10 +67,9 @@ class Hub {
     const y = this.course.solidAt(0);
     this.rig.root.position.set(0, y + 0.03, 0);
     this.rig.tilt.rotation.z = this.course.slopeAt(0);
-    const tx = -10;
-    this.tower.scale.setScalar(0.8);
-    this.tower.position.set(tx, g.world.groundY(tx) - 2.2, -9);
-    this.tower.rotation.y = 0.25;
+    // the Great Clock watches from the ridge behind, softened by the haze
+    this.tower.scale.setScalar(0.36);
+    this.tower.setLayer(LAYER.MID);
     g.engine.scene.add(this.tower);
     this.first = true;
   }
@@ -92,13 +93,20 @@ class Hub {
     let px, py, pz, lx, ly, fov;
     const sway = Math.sin(this.t * 0.16);
     if (this.view === 'shop') {
-      this.spin += dt * 0.6;
-      px = lerp(1.9, 0, portrait); py = y + lerp(1.1, -0.7, portrait); pz = lerp(6.8, 12.7, portrait);
-      lx = px; ly = y + lerp(0.95, -1.0, portrait); fov = 30;
+      // showcase: the rider stays in profile and sways gently instead of spinning
+      this.spin = damp(this.spin, Math.sin(this.t * 0.55) * 0.42, 3, dt);
+      px = lerp(0.2, 0, portrait); py = y + lerp(0.2, -0.7, portrait); pz = lerp(10.6, 12.7, portrait);
+      lx = px; ly = y + lerp(-0.55, -1.0, portrait); fov = 30;
     } else {
       this.spin = damp(this.spin, 0, 4, dt);
-      px = lerp(3.6, 0.3, portrait) + sway * 1.2; py = y + lerp(2.6, 2.8, portrait); pz = lerp(17, 21, portrait);
+      px = lerp(5.6, 0.3, portrait) + sway * 1.2; py = y + lerp(2.6, 2.8, portrait); pz = lerp(17, 21, portrait);
       lx = px; ly = y + lerp(2.1, 1.6, portrait); fov = lerp(30, 40, portrait);
+    }
+    // the tower stands on the second ridge, to the right of the rider
+    const R = g.world.ridges[1];
+    if (R) {
+      const tx = lerp(25, 6.2, portrait);
+      this.tower.position.set(tx, ridgeY(R.def, this.course, tx, R.seed) - 1.2, R.def.z - 3);
     }
     if (this.first) {
       this.pos.set(px, py, pz);
