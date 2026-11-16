@@ -56,10 +56,23 @@ class TrackVoice {
       g.gain.value = p.vol ?? 0.5;
       let head = g;
       let pump = null;
+      if (p.hp) {
+        // keep the low end for the bass and the kick
+        const f = this.ctx.createBiquadFilter();
+        f.type = 'highpass';
+        f.frequency.value = p.hp;
+        head.connect(f);
+        head = f;
+      }
       if (p.pump) {
         pump = this.ctx.createGain();
-        g.connect(pump);
+        head.connect(pump);
         head = pump;
+      }
+      if (p.pan) {
+        const pn = eng.synth.panner(p.pan);
+        head.connect(pn);
+        head = pn;
       }
       head.connect(this.out);
       if (p.rev) {
@@ -74,6 +87,13 @@ class TrackVoice {
       }
       this.parts.push({ name: pname, p, g, pump, level: p.vol ?? 0.5, on: true });
     }
+    // transitions (cymbal swells and crashes between sections)
+    this.fx = this.ctx.createGain();
+    this.fx.gain.value = def.fx ?? 0.5;
+    this.fx.connect(this.out);
+    const fxRev = this.ctx.createGain();
+    fxRev.gain.value = 0.5;
+    this.fx.connect(fxRev).connect(eng.reverbIn);
     // sections
     this.sections = (def.sections || [{ bars: def.chords.length, on: 'all' }]).map((s) => ({
       bars: s.bars, on: s.on === 'all' ? null : new Set(s.on),
@@ -82,7 +102,11 @@ class TrackVoice {
     this.total = this.sections.reduce((a, s) => a + s.bars, 0);
     this.loopLen = this.sections.slice(this.loopFrom).reduce((a, s) => a + s.bars, 0);
     this.introLen = this.total - this.loopLen;
-    if (def.delay) eng.delay.delayTime.setTargetAtTime((60 / def.bpm) * def.delay, t0, 0.05);
+    if (def.delay) eng.setDelay((60 / def.bpm) * def.delay, t0);
+    // bar index (within the form) at which each section starts
+    this.starts = [];
+    let acc = 0;
+    for (const sc of this.sections) { this.starts.push(acc); acc += sc.bars; }
   }
 
   sectionAt(bar) {
@@ -93,6 +117,17 @@ class TrackVoice {
       b -= s.bars;
     }
     return this.sections[this.sections.length - 1];
+  }
+
+  /** Position of a bar inside the form: { first, last } of its section. */
+  edge(bar) {
+    let b = bar;
+    if (b >= this.total) b = this.introLen + ((b - this.introLen) % this.loopLen);
+    for (let i = 0; i < this.sections.length; i++) {
+      const s0 = this.starts[i], n = this.sections[i].bars;
+      if (b >= s0 && b < s0 + n) return { first: b === s0, last: b === s0 + n - 1 };
+    }
+    return { first: false, last: false };
   }
 
   fade(to, time) {
@@ -145,8 +180,15 @@ class TrackVoice {
     const sec = this.sectionAt(bar);
     const chordEntry = def.chords[bar % def.chords.length];
     const root = typeof chordEntry === 'number' ? chordEntry : chordEntry.d;
+    const chordTones = typeof chordEntry === 'number' ? null : chordEntry.t;
     const lo = quarter / 4, hi = (quarter + 1) / 4;
     const swing = def.swing || 0;
+    // transitions: a breath of cymbal into each new section, a soft crash on its downbeat
+    if (def.fx !== 0 && bar > 0) {
+      const ed = this.edge(bar);
+      if (ed.last && quarter === 2) S.swell(this.fx, tBar + bd * 0.5, bd * 0.5, 1);
+      if (ed.first && quarter === 0) S.crash(this.fx, tBar, 0.8);
+    }
     for (const part of this.parts) {
       const p = part.p;
       if (sec.on && !sec.on.has(part.name)) continue;
@@ -158,10 +200,11 @@ class TrackVoice {
       }
       if (p.type === 'pad') {
         if (quarter !== 0) continue;
-        const tones = p.tones || [0, 2, 4];
+        const tones = p.tones || chordTones || [0, 2, 4];
         for (const tn of tones) {
           const midi = def.key + this.deg(root + tn) + 12 * (p.oct || 0);
-          S.pad(out, tBar, mtof(midi), bd * 1.02, 1, p.bright || 1200);
+          if (p.inst) S.lead(out, tBar, mtof(midi), bd * 1.0, 1, p.inst);
+          else S.pad(out, tBar, mtof(midi), bd * 1.02, 1, p.bright || 1200);
         }
         continue;
       }
@@ -176,14 +219,15 @@ class TrackVoice {
         if (swing && e.n % 4 === 0 && e.i % 2 === 1) t += swing * (bd / e.n);
         const hum = p.type === 'drum' && p.inst === 'kick' ? 0 : (Math.random() - 0.5) * 0.008;
         t += hum;
-        const vel = 0.92 + Math.random() * 0.16;
+        // a little life: random touch, slightly stronger beats
+        const vel = (0.9 + Math.random() * 0.16) * (e.n % 4 === 0 && e.i % (e.n / 4) === 0 ? 1.06 : 1);
         if (p.type === 'drum') {
           const ch = e.v;
           const v = (ch === '-' ? 0.45 : ch === 'o' ? 1.15 : 1) * vel;
           switch (p.inst) {
             case 'kick': S.kick(out, t, v, p.deep); break;
             case 'snare': S.snare(out, t, v, p.style); break;
-            case 'hat': S.hat(out, t, v, ch === 'o'); break;
+            case 'hat': S.hat(out, t, v, ch === 'o', p.style === 'metal'); break;
             case 'clap': S.clap(out, t, v); break;
             case 'shaker': S.shaker(out, t, v); break;
             case 'boom': S.boom(out, t, v); break;
@@ -193,14 +237,15 @@ class TrackVoice {
           continue;
         }
         if (p.type === 'stab' || p.type === 'strum') {
-          const tones = p.tones || [0, 2, 4];
+          const tones = p.tones || chordTones || [0, 2, 4];
           const up = e.v === 'u';
           const list = up ? [...tones].reverse() : tones;
           list.forEach((tn, k) => {
             const midi = def.key + this.deg(root + tn) + 12 * (p.oct || 0);
-            const tt = t + k * (p.type === 'strum' ? 0.013 : 0);
+            const tt = t + k * (p.type === 'strum' ? 0.013 : p.roll || 0);
             const v = vel * (up ? 0.7 : 1) * (e.v === '-' ? 0.5 : 1);
             if (p.inst === 'pluck') S.pluck(out, tt, midi, e.dur * bd * (p.gate || 1.5), v, p.bright ?? 0.5);
+            else if (p.inst === 'piano') S.piano(out, tt, mtof(midi), e.dur * bd * (p.gate || 0.9), v * 0.8, false, k > 0);
             else S.lead(out, tt, mtof(midi), e.dur * bd * (p.gate || 0.9), v * 0.7, p.inst || 'epiano');
           });
           continue;

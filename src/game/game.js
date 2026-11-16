@@ -146,6 +146,7 @@ export class Game {
     this.warp = new Warp(this.engine.scene);
     this.cam = new CameraRig(this.engine.camera);
     this.audio = new AudioEngine();
+    this.audio.setLight(this.quality === 'low');
     this.input = new Input(canvas);
     this.net = new NetClient();
     this.uiRoot = uiRoot;
@@ -280,6 +281,7 @@ export class Game {
     this._applyHdr();
     this.world.density = this.engine.q.density;
     this.fx.density = this.engine.q.particles;
+    this.audio.setLight(q === 'low');
   }
 
   resize() {

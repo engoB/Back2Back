@@ -34,11 +34,12 @@ Tout est généré par le code — il n'y a **aucun fichier image, modèle ou so
 
 | Domaine | Réalisation |
 | --- | --- |
-| Rendu | [Three.js](https://threejs.org) (WebGL). Direction artistique en silhouettes : piste en dégradé, crêtes superposées qui se fondent dans la brume, aplats teintés par l'heure du jour, vraie profondeur et parallaxe. |
-| Monde | Parcours procédural **déterministe** (même graine = même pente, indispensable au multijoueur), chargé par tronçons. |
-| Personnages | Marionnettes animées par cinématique inverse, sans fichier d'animation. |
+| Rendu | [Three.js](https://threejs.org) (WebGL 2). Théâtre de papier en profondeur : piste en dégradé, crêtes superposées, décors **dessinés en courbes vectorielles** dans le code, brume qui dépend de la distance au plan de jeu. |
+| Post-traitement | Profondeur de champ par plans (lointains flous, premier plan net), halo lumineux HDR, anticrénelage multi-échantillon, étalonnage, vignette. Trois niveaux de qualité, choisis automatiquement. |
+| Monde | Parcours procédural **déterministe** (même graine = même pente, indispensable au multijoueur), relief en courbes lisses, chargé par tronçons. |
+| Personnages | Marionnettes en cinématique inverse, sans fichier d'animation : poses clés mélangées, mains et jambes à ressorts, écharpes et capes simulées, planche qui se détache dans les chutes. |
 | Effets | Particules, traînées lumineuses, éclairs, météo calculée par le processeur graphique, tunnel temporel. |
-| Audio | Web Audio : instruments synthétisés, séquenceur, neuf thèmes originaux écrits en degrés de gamme autour d'un même leitmotiv, bruitages. |
+| Audio | Web Audio : piano, ensemble de cordes, chœur, nappes stéréo, percussions et synthés entièrement synthétisés ; réverbération de salle, écho stéréo, mastering. Dix thèmes originaux écrits en degrés de gamme autour d'un même leitmotiv, bruitages. |
 | Cinématiques | Petit moteur de séquences (plans, acteurs, effets, sous-titres) joué dans le monde du jeu. |
 | Multijoueur | Serveur Node + WebSocket : salons à code, partie rapide, relais des positions. Chaque client simule la même pente. |
 | PWA | Manifest, service worker (tout le jeu est mis en cache), installation, plein écran, vibrations, maintien de l'écran allumé. |

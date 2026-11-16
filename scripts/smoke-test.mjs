@@ -117,7 +117,7 @@ test('multiplayer: rooms, relay and results', () => {
   assert.equal(d.room, e.room);
 });
 
-test('soundtrack: every bar has 12 or 16 steps and known parts', () => {
+test('soundtrack: every bar has a whole number of steps and known parts', () => {
   for (const [name, tr] of Object.entries(TRACKS)) {
     for (const [pn, p] of Object.entries(tr.parts)) {
       const src = p.seq ?? p.pat;
@@ -125,7 +125,7 @@ test('soundtrack: every bar has 12 or 16 steps and known parts', () => {
       const drum = p.type === 'drum' || p.type === 'stab' || p.type === 'strum';
       for (const s of Array.isArray(src) ? src : [src]) {
         const n = drum ? s.replace(/\s/g, '').length : s.trim().split(/\s+/).length;
-        assert.ok(n === 12 || n === 16, `${name}.${pn}: ${n} steps`);
+        assert.ok([8, 12, 16, 24, 32].includes(n), `${name}.${pn}: ${n} steps`);
       }
     }
     for (const sec of tr.sections || []) if (sec.on !== 'all') for (const pn of sec.on) assert.ok(tr.parts[pn], `${name}: unknown part ${pn}`);

@@ -5,7 +5,7 @@ import { MusicPlayer } from './music.js';
 import { clamp } from '../core/math.js';
 
 const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
-const MUSIC_GAIN = 0.6;
+const MUSIC_GAIN = 0.46;
 
 export class AudioEngine {
   constructor() {
@@ -44,15 +44,32 @@ export class AudioEngine {
 
   _build(ctx) {
     const S = (this.synth = new Synth(ctx));
+    S.light = !!this.light;
+    // ---- master: gentle tone shaping, tape-like saturation, glue compression
     this.master = ctx.createGain();
     this.master.gain.value = 0.9;
+    const low = ctx.createBiquadFilter();
+    low.type = 'lowshelf';
+    low.frequency.value = 90;
+    low.gain.value = 1.5;
+    const air = ctx.createBiquadFilter();
+    air.type = 'highshelf';
+    air.frequency.value = 8500;
+    air.gain.value = 2;
+    const sat = ctx.createWaveShaper();
+    const curve = new Float32Array(1024);
+    for (let i = 0; i < 1024; i++) {
+      const x = (i / 1023) * 2 - 1;
+      curve[i] = Math.tanh(x * 1.35) / Math.tanh(1.35);
+    }
+    sat.curve = curve;
     const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -9;
-    comp.knee.value = 10;
-    comp.ratio.value = 4;
-    comp.attack.value = 0.003;
-    comp.release.value = 0.22;
-    this.master.connect(comp).connect(ctx.destination);
+    comp.threshold.value = -11;
+    comp.knee.value = 12;
+    comp.ratio.value = 3;
+    comp.attack.value = 0.008;
+    comp.release.value = 0.25;
+    this.master.connect(low).connect(air).connect(sat).connect(comp).connect(ctx.destination);
 
     this.musicBus = ctx.createGain();
     this.musicBus.gain.value = this.musicVol * MUSIC_GAIN;
@@ -65,23 +82,39 @@ export class AudioEngine {
     this.sfxBus.gain.value = this.sfxVol;
     this.sfxBus.connect(this.master);
 
+    // ---- hall: pre-delay, convolution, a return kept out of the low end
     this.reverbIn = ctx.createGain();
+    const pre = ctx.createDelay(0.1);
+    pre.delayTime.value = 0.022;
     const conv = ctx.createConvolver();
-    conv.buffer = S.impulse(2.6, 2.4);
+    conv.buffer = S.impulse(2.8, 3.0);
+    const revHp = ctx.createBiquadFilter();
+    revHp.type = 'highpass';
+    revHp.frequency.value = 230;
+    const revLp = ctx.createBiquadFilter();
+    revLp.type = 'lowpass';
+    revLp.frequency.value = 7200;
     const revOut = ctx.createGain();
-    revOut.gain.value = 0.55;
-    this.reverbIn.connect(conv).connect(revOut).connect(this.musicFilter);
+    revOut.gain.value = 0.5;
+    this.reverbIn.connect(pre).connect(conv).connect(revHp).connect(revLp).connect(revOut).connect(this.musicFilter);
 
+    // ---- echo: ping-pong between the two sides, darker at each bounce
     this.delayIn = ctx.createGain();
-    this.delay = ctx.createDelay(1.5);
-    this.delay.delayTime.value = 0.4;
+    const dl = ctx.createDelay(1.5), dr = ctx.createDelay(1.5);
+    dl.delayTime.value = dr.delayTime.value = 0.4;
     const fb = ctx.createGain();
-    fb.gain.value = 0.36;
+    fb.gain.value = 0.34;
     const dlp = ctx.createBiquadFilter();
     dlp.type = 'lowpass';
-    dlp.frequency.value = 3200;
-    this.delayIn.connect(this.delay).connect(dlp).connect(fb).connect(this.delay);
-    dlp.connect(this.musicFilter);
+    dlp.frequency.value = 3000;
+    const pl = S.panner(-0.8), pr = S.panner(0.8);
+    this.delayIn.connect(dl);
+    dl.connect(pl).connect(this.musicFilter);
+    dl.connect(dr);
+    dr.connect(pr).connect(this.musicFilter);
+    dr.connect(dlp).connect(fb).connect(dl);
+    this.delays = [dl, dr];
+    this.delay = dl; // kept for callers that read it
 
     // sfx reverb send
     this.sfxRev = ctx.createGain();
@@ -89,6 +122,18 @@ export class AudioEngine {
     this.sfxRev.connect(conv);
 
     this._makeLoops(ctx, S);
+  }
+
+  /** Lighter instruments (fewer voices per note) for modest devices. */
+  setLight(on) {
+    this.light = !!on;
+    if (this.synth) this.synth.light = this.light;
+  }
+
+  /** Echo time in seconds (each side of the ping-pong). */
+  setDelay(seconds, at) {
+    if (!this.delays) return;
+    for (const d of this.delays) d.delayTime.setTargetAtTime(Math.min(1.4, seconds), at ?? this.ctx.currentTime, 0.05);
   }
 
   _makeLoops(ctx, S) {

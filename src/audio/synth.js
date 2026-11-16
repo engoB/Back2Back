@@ -1,12 +1,35 @@
 // Synthesised instruments (Web Audio). Every sound of the game is generated:
 // no sample files. Each function schedules one note at time `t` into `out`.
 export const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+/**
+ * Filter sweeps and vibratos are computed once per audio block instead of once
+ * per sample: inaudible, and several times cheaper for the processor.
+ */
+const krate = (param) => {
+  try { param.automationRate = 'k-rate'; } catch (e) { /* older engines keep audio rate */ }
+};
+const lerp = (a, b, t) => a + (b - a) * t;
+
+// Harmonic recipes of the piano, by register (bass strings are far richer than the top ones)
+const PIANO_PARTIALS = [
+  [1, 0.62, 0.5, 0.34, 0.3, 0.2, 0.18, 0.12, 0.1, 0.09, 0.07, 0.06, 0.05, 0.04, 0.035, 0.03, 0.025, 0.02],
+  [1, 0.5, 0.33, 0.2, 0.13, 0.1, 0.06, 0.05, 0.035, 0.025, 0.018, 0.012],
+  [1, 0.36, 0.16, 0.08, 0.04, 0.02, 0.01],
+];
+// Vowel formants of the choir: [frequency, Q, level]
+const VOWELS = {
+  ah: [[760, 5, 1], [1180, 6, 0.6], [2850, 9, 0.25]],
+  oo: [[340, 5, 1], [760, 6, 0.4], [2500, 8, 0.12]],
+};
 
 export class Synth {
   constructor(ctx) {
     this.ctx = ctx;
     this.noise = this._noiseBuffer(2);
     this.ks = new Map();
+    this.waves = new Map();
+    this.light = false; // fewer voices per note on modest devices
   }
 
   _noiseBuffer(sec) {
@@ -16,18 +39,27 @@ export class Synth {
     return b;
   }
 
-  /** Generated reverb impulse (stereo, exponential decay). */
-  impulse(sec = 2.4, decay = 2.6) {
-    const ctx = this.ctx, n = Math.floor(ctx.sampleRate * sec);
-    const b = ctx.createBuffer(2, n, ctx.sampleRate);
+  /** Generated hall impulse: decorrelated stereo tail that darkens as it decays, a few early reflections. */
+  impulse(sec = 3.2, decay = 3.2) {
+    const ctx = this.ctx, sr = ctx.sampleRate, n = Math.floor(sr * sec);
+    const b = ctx.createBuffer(2, n, sr);
     for (let ch = 0; ch < 2; ch++) {
       const d = b.getChannelData(ch);
-      let lp = 0;
+      let lp = 0, lp2 = 0;
+      const onset = Math.floor(sr * 0.012);
       for (let i = 0; i < n; i++) {
         const t = i / n;
         const w = Math.random() * 2 - 1;
-        lp += (w - lp) * (0.9 - 0.75 * t); // gets darker along the tail
-        d[i] = lp * Math.pow(1 - t, decay) * (i < 400 ? i / 400 : 1);
+        const k = 0.75 - 0.68 * Math.pow(t, 0.6); // high frequencies die first
+        lp += (w - lp) * k;
+        lp2 += (lp - lp2) * (0.9 - 0.4 * t);
+        d[i] = lp2 * Math.pow(1 - t, decay) * (i < onset ? i / onset : 1) * 1.6;
+      }
+      // early reflections, different on each side
+      for (let k = 0; k < 7; k++) {
+        const at = Math.floor(sr * (0.011 + k * 0.0093 + (ch ? 0.0037 : 0) + Math.random() * 0.004));
+        const amp = 0.5 * Math.pow(0.72, k) * (Math.random() < 0.5 ? -1 : 1);
+        for (let j = 0; j < 24 && at + j < n; j++) d[at + j] += amp * (1 - j / 24);
       }
     }
     return b;
@@ -44,15 +76,36 @@ export class Synth {
     o.type = type;
     o.frequency.value = freq;
     o.detune.value = detune;
+    krate(o.detune);
     o.start(t);
     o.stop(stop);
     return o;
+  }
+  /** Stereo placement (-1 left, 1 right). */
+  panner(v) {
+    const ctx = this.ctx;
+    if (!ctx.createStereoPanner) return this.gain(1);
+    const p = ctx.createStereoPanner();
+    p.pan.value = v;
+    return p;
+  }
+  /** Cached periodic wave from a list of harmonic amplitudes. */
+  wave(key, amps) {
+    let w = this.waves.get(key);
+    if (!w) {
+      const re = new Float32Array(amps.length + 1), im = new Float32Array(amps.length + 1);
+      for (let i = 0; i < amps.length; i++) im[i + 1] = amps[i];
+      w = this.ctx.createPeriodicWave(re, im);
+      this.waves.set(key, w);
+    }
+    return w;
   }
   filter(type, freq, q = 0.7) {
     const f = this.ctx.createBiquadFilter();
     f.type = type;
     f.frequency.value = freq;
     f.Q.value = q;
+    krate(f.frequency);
     return f;
   }
   noiseSrc(t, dur, rate = 1) {
@@ -115,12 +168,58 @@ export class Synth {
       o.connect(og).connect(out);
     }
   }
-  hat(out, t, v = 1, open = false) {
-    const len = open ? 0.24 : 0.045;
-    const n = this.noiseSrc(t, len + 0.02, 1.4), g = this.gain(0), hp = this.filter('highpass', 7800);
-    g.gain.setValueAtTime(v * 0.42, t);
+  hat(out, t, v = 1, open = false, metal = false) {
+    const len = open ? (metal ? 0.3 : 0.24) : metal ? 0.055 : 0.045;
+    const g = this.gain(0);
+    g.gain.setValueAtTime(v * (metal ? 0.5 : 0.42), t);
     g.gain.exponentialRampToValueAtTime(0.001, t + len);
+    if (metal) {
+      // six detuned squares (the classic drum-machine cymbal), rendered once and replayed
+      const src = this.ctx.createBufferSource();
+      src.buffer = this._metal();
+      src.start(t, Math.random() * 0.05);
+      src.stop(t + len + 0.02);
+      src.connect(g).connect(out);
+    } else {
+      const n = this.noiseSrc(t, len + 0.02, 1.4), hp = this.filter('highpass', 7800);
+      n.connect(hp).connect(g).connect(out);
+    }
+  }
+  _metal() {
+    if (this.metalBuf) return this.metalBuf;
+    const ctx = this.ctx, sr = ctx.sampleRate, n = Math.floor(sr * 0.45);
+    const b = ctx.createBuffer(1, n, sr), d = b.getChannelData(0);
+    const fr = [267, 396, 480, 680, 702, 1040];
+    let hp1 = 0, hp2 = 0, prev = 0, prev2 = 0;
+    const k = Math.exp((-2 * Math.PI * 7000) / sr);
+    for (let i = 0; i < n; i++) {
+      let x = 0;
+      for (const f of fr) x += (((i * f) / sr) % 1) < 0.5 ? 1 : -1;
+      // two one-pole high-pass stages keep only the shimmer
+      hp1 = k * (hp1 + x - prev); prev = x;
+      hp2 = k * (hp2 + hp1 - prev2); prev2 = hp1;
+      d[i] = hp2 * 0.22;
+    }
+    return (this.metalBuf = b);
+  }
+  /** Rising breath of noise that leads into a downbeat. */
+  swell(out, t, dur, v = 1) {
+    const n = this.noiseSrc(t, dur + 0.15, 1.2), g = this.gain(0), hp = this.filter('highpass', 2000);
+    hp.frequency.setValueAtTime(1600, t);
+    hp.frequency.exponentialRampToValueAtTime(6800, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(v * 0.2, t + dur);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.1);
     n.connect(hp).connect(g).connect(out);
+  }
+  /** Soft crash cymbal on a downbeat. */
+  crash(out, t, v = 1) {
+    const n = this.noiseSrc(t, 2.4, 1.3), g = this.gain(0), hp = this.filter('highpass', 4200), pk = this.filter('peaking', 8000, 0.8);
+    pk.gain.value = 5;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(v * 0.26, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
+    n.connect(hp).connect(pk).connect(g).connect(out);
   }
   clap(out, t, v = 1) {
     for (let i = 0; i < 3; i++) {
@@ -171,6 +270,104 @@ export class Synth {
     n.connect(lp).connect(ng).connect(out);
   }
 
+  // ---- acoustic colours ---------------------------------------------------
+  /**
+   * Grand piano: two slightly detuned strings per note, a tone that mellows as it
+   * rings, the thump of the hammer, a damper on release. felt = softer, closer.
+   */
+  piano(out, t, f, dur, v = 1, felt = false, chord = false) {
+    const midi = Math.round(69 + 12 * Math.log2(f / 440));
+    const reg = clamp((midi - 36) / 60, 0, 1);
+    const wave = this.wave('pno' + (midi < 48 ? 0 : midi < 67 ? 1 : 2), PIANO_PARTIALS[midi < 48 ? 0 : midi < 67 ? 1 : 2]);
+    const tail = lerp(4.6, 1.3, reg), a = felt ? 0.012 : 0.004, rel = felt ? 0.32 : 0.22;
+    const hold = Math.max(0.06, dur);
+    const peak = v * (felt ? 0.44 : 0.5) * lerp(1.1, 0.8, reg);
+    const env = this.gain(0), damper = this.gain(1);
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.linearRampToValueAtTime(peak, t + a);
+    env.gain.exponentialRampToValueAtTime(peak * 0.42, t + a + 0.22);
+    env.gain.exponentialRampToValueAtTime(peak * 0.002, t + a + tail);
+    damper.gain.setValueAtTime(1, t + hold);
+    damper.gain.exponentialRampToValueAtTime(0.0001, t + hold + rel);
+    const end = Math.min(t + a + tail, t + hold + rel) + 0.03;
+    const lp = this.filter('lowpass', 2000, 0.4);
+    const top = Math.min(15000, f * (felt ? 4.5 : 9) * (0.55 + 0.6 * Math.min(1.2, v)));
+    lp.frequency.setValueAtTime(top, t);
+    lp.frequency.exponentialRampToValueAtTime(Math.max(f * 1.6, top * 0.22), t + 0.9);
+    // inside a chord one string per note is enough: the notes detune each other
+    for (const d of this.light || chord ? [0] : [-2.4, 2.6]) {
+      const o = this.ctx.createOscillator();
+      o.setPeriodicWave(wave);
+      o.frequency.value = f;
+      o.detune.value = d;
+      o.start(t);
+      o.stop(end);
+      o.connect(lp);
+    }
+    lp.connect(env).connect(damper).connect(out);
+    if (chord) return;
+    const n = this.noiseSrc(t, 0.06), ng = this.gain(0), bp = this.filter('bandpass', felt ? 900 : 2400, 0.8);
+    ng.gain.setValueAtTime(peak * (felt ? 0.22 : 0.11), t);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + (felt ? 0.045 : 0.025));
+    n.connect(bp).connect(ng).connect(damper);
+  }
+
+  /** String section: bowed swell spread across the stereo field. o: { attack, release, bright } */
+  ens(out, t, f, dur, v = 1, o = {}) {
+    const att = o.attack ?? 0.22, rel = o.release ?? 0.7, bright = o.bright ?? 2600;
+    const hold = Math.max(att + 0.04, dur), end = t + hold + rel + 0.05, peak = v * 0.26;
+    const g = this.gain(0), lp = this.filter('lowpass', bright, 0.4);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(peak, t + att);
+    g.gain.setValueAtTime(peak, t + hold);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + hold + rel);
+    lp.frequency.setValueAtTime(bright * 0.5, t);
+    lp.frequency.linearRampToValueAtTime(bright, t + att * 1.5);
+    let lg = null;
+    if (att > 0.1 && !this.light) {
+      // a slow, shared vibrato once the note has settled
+      const lfo = this.osc('sine', 5 + Math.random() * 0.7, t, end);
+      lg = this.gain(0);
+      lg.gain.setValueAtTime(0, t);
+      lg.gain.linearRampToValueAtTime(7, t + att + 0.25);
+      lfo.connect(lg);
+    }
+    const voices = this.light ? [[-0.6, -9], [0.6, 8]] : [[-0.75, -13], [0.75, 11], [0, -3]];
+    for (const [pan, det] of voices) {
+      const os = this.osc('sawtooth', f, t, end, det), pn = this.panner(pan);
+      if (lg) lg.connect(os.detune);
+      os.connect(pn).connect(lp);
+    }
+    lp.connect(g).connect(out);
+  }
+
+  /** Wordless choir: two voices per side shaped by vowel formants ("ah" or "oo"). */
+  choir(out, t, f, dur, v = 1, vowel = 'ah') {
+    const F = (VOWELS[vowel] || VOWELS.ah).slice(0, this.light ? 2 : 3);
+    const att = 0.32, rel = 0.9, hold = Math.max(att + 0.05, dur), end = t + hold + rel + 0.05, peak = v * 0.9;
+    const g = this.gain(0);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(peak, t + att);
+    g.gain.setValueAtTime(peak, t + hold);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + hold + rel);
+    const lfo = this.osc('sine', 4.7 + Math.random() * 0.8, t, end), lg = this.gain(0);
+    lg.gain.setValueAtTime(0, t);
+    lg.gain.linearRampToValueAtTime(9, t + 0.6);
+    lfo.connect(lg);
+    for (const [pan, det] of [[-0.6, -9], [0.6, 8]]) {
+      const src = this.osc('sawtooth', f, t, end, det), pn = this.panner(pan);
+      lg.connect(src.detune);
+      for (const [fr, q, lvl] of F) {
+        const bp = this.filter('bandpass', fr, q), bg = this.gain(lvl);
+        src.connect(bp).connect(bg).connect(pn);
+      }
+      pn.connect(g);
+    }
+    const n = this.noiseSrc(t, hold + rel), ng = this.gain(0.03), nb = this.filter('bandpass', F[1][0], 2);
+    n.connect(nb).connect(ng).connect(g);
+    g.connect(out);
+  }
+
   // ---- pitched -----------------------------------------------------------
   bass(out, t, f, dur, v = 1, kind = 'synth') {
     const g = this.gain(0);
@@ -202,9 +399,27 @@ export class Synth {
   }
 
   lead(out, t, f, dur, v = 1, kind = 'square') {
+    switch (kind) {
+      case 'piano': return this.piano(out, t, f, dur, v);
+      case 'felt': return this.piano(out, t, f, dur, v, true);
+      case 'ens': return this.ens(out, t, f, dur, v);
+      case 'stac': return this.ens(out, t, f, dur, v * 1.25, { attack: 0.025, release: 0.14, bright: 3200 });
+      case 'choir': return this.choir(out, t, f, dur, v, 'ah');
+      case 'choirOo': return this.choir(out, t, f, dur, v, 'oo');
+    }
     const g = this.gain(0);
     let end;
     switch (kind) {
+      case 'celesta': {
+        end = this.adsr(g.gain, t, 0.002, 0.7, 0.06, 0.7, Math.min(dur, 0.5), v * 0.42);
+        const c = this.osc('sine', f, t, end), m = this.osc('sine', f * 4, t, end), mg = this.gain(0);
+        mg.gain.setValueAtTime(f * 1.6, t);
+        mg.gain.exponentialRampToValueAtTime(1, t + 0.35);
+        m.connect(mg).connect(c.frequency);
+        const tri = this.osc('triangle', f * 2, t, end), tg = this.gain(0.12);
+        c.connect(g); tri.connect(tg).connect(g);
+        break;
+      }
       case 'saw': {
         end = this.adsr(g.gain, t, 0.012, 0.1, 0.7, 0.16, dur, v * 0.42);
         const lp = this.filter('lowpass', 3200, 1.5);
@@ -311,13 +526,23 @@ export class Synth {
     g.connect(out);
   }
 
+  /** Warm stereo pad: a detuned saw on each side over a sine foundation, the filter opening slowly. */
   pad(out, t, f, dur, v = 1, bright = 1200) {
-    const g = this.gain(0);
-    const end = this.adsr(g.gain, t, 0.35, 0.3, 0.8, 0.9, dur, v * 0.16);
-    const lp = this.filter('lowpass', bright, 0.5);
-    for (const d of [-10, 0, 9]) this.osc('sawtooth', f, t, end, d).connect(lp);
-    const sub = this.osc('sine', f / 2, t, end), sg = this.gain(0.6);
-    sub.connect(sg).connect(lp);
+    const att = 0.45, rel = 1.1, hold = Math.max(att + 0.1, dur), end = t + hold + rel + 0.05, peak = v * 0.15;
+    const g = this.gain(0), lp = this.filter('lowpass', bright, 0.5);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(peak, t + att);
+    g.gain.setValueAtTime(peak, t + hold);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + hold + rel);
+    // movement without a modulator per note
+    lp.frequency.setValueAtTime(bright * 0.6, t);
+    lp.frequency.linearRampToValueAtTime(bright * 1.15, t + hold * 0.6);
+    lp.frequency.linearRampToValueAtTime(bright * 0.8, t + hold + rel);
+    for (const [pan, det] of [[-0.8, -9], [0.8, 8]]) {
+      const pn = this.panner(pan);
+      this.osc('sawtooth', f, t, end, det).connect(pn).connect(lp);
+    }
+    if (!this.light) this.osc('sine', f * 0.5, t, end).connect(lp);
     lp.connect(g).connect(out);
   }
 
