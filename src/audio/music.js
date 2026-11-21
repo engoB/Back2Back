@@ -281,7 +281,13 @@ export class MusicPlayer {
     if (this.current) this.current.stop(fade);
     this.current = null;
     if (!def) return;
-    const v = new TrackVoice(this.eng, name, def, this.eng.ctx.currentTime + 0.1);
+    let v;
+    try {
+      v = new TrackVoice(this.eng, name, def, this.eng.ctx.currentTime + 0.1);
+    } catch (e) {
+      console.warn('music unavailable', e);
+      return;
+    }
     v.fade(def.gain ?? 1, Math.max(0.3, fade * 0.7));
     v.setIntensity(this.intensity);
     this.voices.push(v);
@@ -304,7 +310,9 @@ export class MusicPlayer {
     if (!ctx || ctx.state !== 'running') return;
     if (!this.current && this.wanted) this.play(this.wanted, 0.5);
     const until = ctx.currentTime + 0.24;
-    for (const v of this.voices) v.schedule(until);
+    for (const v of this.voices) {
+      try { v.schedule(until); } catch (e) { v.dead = true; }
+    }
     this.voices = this.voices.filter((v) => !v.dead);
   }
 }

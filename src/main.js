@@ -22,7 +22,11 @@ function begin() {
   begin.done = true;
   boot.classList.add('gone');
   setTimeout(() => boot.remove(), 700);
-  game.start();
+  try {
+    game.start();
+  } catch (e) {
+    console.error(e);
+  }
 }
 
 requestAnimationFrame(() => {
