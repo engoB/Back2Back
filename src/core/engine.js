@@ -8,7 +8,7 @@ THREE.ColorManagement.enabled = false;
 /** post: null = draw straight to the screen (fastest); otherwise the full stack. */
 export const QUALITY = {
   low: { ratio: 1, density: 0.6, particles: 0.5, post: null },
-  medium: { ratio: 1.5, density: 0.85, particles: 0.8, post: { msaa: 2, mips: 3 } },
+  medium: { ratio: 1.3, density: 0.8, particles: 0.7, post: { msaa: 2, mips: 3 } },
   high: { ratio: 2, density: 1, particles: 1, post: { msaa: 4, mips: 4 } },
 };
 
@@ -17,6 +17,7 @@ export class Engine {
     this.canvas = canvas;
     this.q = QUALITY[quality] || QUALITY.high;
     this.qualityName = quality;
+    this.scale = 1; // adaptive resolution (1 = full)
     // with the post stack, anti-aliasing happens in the off-screen buffers
     this.renderer = new THREE.WebGLRenderer({
       canvas, antialias: !this.q.post, powerPreference: 'high-performance', stencil: false, alpha: false,
@@ -60,12 +61,20 @@ export class Engine {
     this.resize();
   }
 
+  /** Render resolution factor (adaptive quality). */
+  setScale(v) {
+    v = Math.min(1, Math.max(0.55, v));
+    if (Math.abs(v - this.scale) < 0.02) return;
+    this.scale = v;
+    this.resize();
+  }
+
   resize() {
     const w = Math.max(1, window.innerWidth), h = Math.max(1, window.innerHeight);
     this.width = w;
     this.height = h;
     this.aspect = w / h;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.q.ratio));
+    this.renderer.setPixelRatio(Math.max(0.7, Math.min(window.devicePixelRatio || 1, this.q.ratio) * this.scale));
     this.renderer.setSize(w, h, false);
     this.camera.aspect = this.aspect;
     this.camera.updateProjectionMatrix();

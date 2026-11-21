@@ -346,7 +346,7 @@ details.card .text { width: 100%; font-size: 13px; }
 .hud-speed i { font-style: normal; font-size: 10px; font-weight: 800; margin-left: 3px; opacity: 0.8; }
 .hud-combo { position: absolute; top: calc(var(--sat) + 78px); left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; min-width: 150px; }
 .hud-combo em { font-style: italic; font-weight: 900; font-size: 11px; letter-spacing: 0.2em; color: var(--cyan); }
-.hud-combo b { font-size: 34px; font-weight: 900; line-height: 1; color: var(--gold); font-style: italic; }
+.hud-combo b { font-size: 26px; font-weight: 900; line-height: 1; color: var(--gold); font-style: italic; }
 .hud-combo span { font-weight: 800; font-size: 14px; }
 .hud-combo .bar { width: 120px; height: 5px; min-height: 0; margin: 4px 0 0; border-radius: 9px; background: rgba(8, 12, 32, 0.5); overflow: hidden; display: block; }
 .hud-combo .bar i { display: block; height: 100%; background: var(--gold); transform-origin: left; }
@@ -356,35 +356,38 @@ details.card .text { width: 100%; font-size: 13px; }
 .hud[data-mode='race'] .hud-tricks { top: calc(var(--sat) + 200px); }
 .hud[data-mode='story'] .hud-combo { top: calc(var(--sat) + 90px); }
 .hud[data-mode='story'] .hud-tricks { top: calc(var(--sat) + 180px); }
-.hud-tricks { position: absolute; top: calc(var(--sat) + 168px); left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.hud-tricks { position: absolute; top: calc(var(--sat) + 150px); left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .trick { display: flex; align-items: baseline; gap: 8px; font-weight: 900; font-style: italic; animation: trick 1.5s ease-out forwards; white-space: nowrap; }
-.trick b { font-size: 17px; letter-spacing: 0.04em; text-transform: uppercase; }
-.trick i { font-size: 15px; color: var(--gold); }
-.trick.big b { font-size: 23px; color: #fff6a8; }
-.trick.bank b { color: var(--cyan); font-size: 20px; }
+.trick b { font-size: 13.5px; letter-spacing: 0.04em; text-transform: uppercase; }
+.trick i { font-size: 12.5px; color: var(--gold); }
+.trick.big b { font-size: 17px; color: #fff6a8; }
+.trick.bank b { color: var(--cyan); font-size: 15px; }
 .trick.bank { animation-duration: 1.9s; }
 @keyframes trick { 0% { opacity: 0; transform: translateY(14px) scale(0.7); } 12% { opacity: 1; transform: none; } 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(-16px); } }
+/* while the era card is up, the other messages step down below it (still above the action) */
+.hud.card-on .hud-tricks, .hud.card-on .hud-crash { top: calc(var(--sat) + 270px); }
+.hud-toasts .toast { font-size: 12px; padding: 7px 12px; max-width: 92vw; }
 .hud-toasts { position: absolute; top: calc(var(--sat) + 44px); left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; text-shadow: none; }
 .toast.power { border-color: var(--cyan); color: var(--cyan); }
 .toast.mission { border-color: var(--gold); color: var(--gold); }
 .toast.fulgur { background: linear-gradient(180deg, #fff6a8, #ffb52e); color: #2a1700; border: 0; font-size: 17px; padding: 10px 20px; letter-spacing: 0.1em; animation: toast-in 0.25s, pulse 0.4s ease-in-out infinite; }
-.hud-hint { position: absolute; left: 50%; bottom: 26%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 12px; width: min(84vw, 380px); text-align: center; font-weight: 800; font-size: 17px; padding: 14px 18px; border-radius: 18px; background: rgba(8, 12, 32, 0.6); border: 1px solid rgba(255, 255, 255, 0.2); text-shadow: none; }
-.tap { position: relative; width: 46px; height: 46px; }
+.hud-hint { position: absolute; left: 50%; bottom: calc(var(--sab) + 62px); transform: translateX(-50%); display: flex; flex-direction: row; align-items: center; gap: 10px; width: auto; max-width: min(88vw, 420px); text-align: left; font-weight: 800; font-size: 14px; padding: 9px 14px; border-radius: 18px; background: rgba(8, 12, 32, 0.6); border: 1px solid rgba(255, 255, 255, 0.2); text-shadow: none; }
+.tap { position: relative; width: 30px; height: 30px; flex: none; }
 .tap i { position: absolute; inset: 0; border-radius: 50%; border: 3px solid #fff; animation: ripple 1.2s ease-out infinite; }
 .tap i + i { animation-delay: 0.6s; }
 @keyframes ripple { from { transform: scale(0.3); opacity: 1; } to { transform: scale(1.2); opacity: 0; } }
-.hud-card { --c: #5fe1ff; position: absolute; left: 0; right: 0; top: 30%; display: flex; flex-direction: column; align-items: center; text-align: center; }
-.hud-card.play { animation: card 3s ease-out forwards; }
-.hud-card small { font-weight: 900; letter-spacing: 0.36em; font-size: 12px; text-transform: uppercase; color: var(--c); }
-.hud-card b { font-size: clamp(54px, 17vw, 110px); font-weight: 900; font-style: italic; line-height: 1; color: #fff; text-shadow: 0 0 34px var(--c), 0 5px 0 rgba(8, 12, 32, 0.5); }
-.hud-card span { font-size: clamp(17px, 5vw, 26px); font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+.hud-card { --c: #5fe1ff; position: absolute; left: 0; right: 0; top: calc(var(--sat) + 112px); display: flex; flex-direction: column; align-items: center; text-align: center; }
+.hud-card.play { animation: card 2.4s ease-out forwards; }
+.hud-card small { font-weight: 900; letter-spacing: 0.3em; font-size: 10px; text-transform: uppercase; color: var(--c); }
+.hud-card b { font-size: clamp(30px, 9vw, 54px); font-weight: 900; font-style: italic; line-height: 1; color: #fff; text-shadow: 0 0 34px var(--c), 0 5px 0 rgba(8, 12, 32, 0.5); }
+.hud-card span { font-size: clamp(12px, 3.4vw, 16px); font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
 .hud-card em { margin-top: 8px; font-style: normal; font-weight: 900; color: var(--gold); letter-spacing: 0.1em; }
 @keyframes card { 0% { opacity: 0; transform: scale(1.6); } 10% { opacity: 1; transform: none; } 78% { opacity: 1; } 100% { opacity: 0; transform: translateY(-20px); } }
-.hud-year { --c: #5fe1ff; position: absolute; left: 0; right: 0; top: 16%; text-align: center; font-size: clamp(44px, 14vw, 96px); font-weight: 900; font-style: italic; color: #fff; text-shadow: 0 0 30px var(--c), 0 0 6px #fff; letter-spacing: 0.04em; }
+.hud-year { --c: #5fe1ff; position: absolute; left: 0; right: 0; top: calc(var(--sat) + 112px); text-align: center; font-size: clamp(30px, 9vw, 54px); font-weight: 900; font-style: italic; color: #fff; text-shadow: 0 0 30px var(--c), 0 0 6px #fff; letter-spacing: 0.04em; }
 .hud-count { position: absolute; inset: 0; display: grid; place-items: center; font-size: clamp(110px, 34vw, 210px); font-weight: 900; font-style: italic; color: #fff; text-shadow: 0 0 40px var(--cyan), 0 8px 0 rgba(8, 12, 32, 0.5); }
 .hud-count.play { animation: count 0.9s ease-out forwards; }
 @keyframes count { 0% { opacity: 0; transform: scale(2.2); } 18% { opacity: 1; transform: scale(1); } 70% { opacity: 1; } 100% { opacity: 0; transform: scale(0.8); } }
-.hud-crash { position: absolute; left: 0; right: 0; top: 38%; text-align: center; font-size: clamp(26px, 8vw, 44px); font-weight: 900; font-style: italic; color: #ffd0d0; animation: trick 1.5s ease-out forwards; }
+.hud-crash { position: absolute; left: 0; right: 0; top: calc(var(--sat) + 150px); text-align: center; font-size: clamp(18px, 5vw, 26px); font-weight: 900; font-style: italic; color: #ffd0d0; animation: trick 1.5s ease-out forwards; }
 .hud-race { display: flex; align-items: center; gap: 10px; font-weight: 900; }
 .hud-race .rk b { font-size: 30px; color: var(--gold); font-style: italic; }
 .hud-race .rk span { font-size: 14px; opacity: 0.8; }
@@ -455,11 +458,13 @@ details.card .text { width: 100%; font-size: 13px; }
   .hud-tricks, .hud[data-mode='story'] .hud-tricks { top: calc(var(--sat) + 136px); }
   .hud[data-mode='race'] .hud-combo { top: calc(var(--sat) + 74px); }
   .hud[data-mode='race'] .hud-tricks { top: calc(var(--sat) + 150px); }
-  .hud-hint { bottom: 13%; flex-direction: row; padding: 10px 18px; font-size: 15px; width: auto; max-width: 80vw; }
+  .hud-hint { bottom: calc(var(--sab) + 52px); }
   .hud-hint .tap { width: 34px; height: 34px; flex: none; }
-  .hud-card { top: 17%; }
-  .hud-card b { font-size: clamp(40px, 11vw, 84px); }
-  .hud-year { top: 20%; }
+  .hud-card { top: calc(var(--sat) + 62px); }
+  .hud-card b { font-size: clamp(26px, 6vw, 42px); }
+  .hud-year { top: calc(var(--sat) + 62px); font-size: clamp(26px, 6vw, 42px); }
+  .hud-crash { top: calc(var(--sat) + 92px); }
+  .hud.card-on .hud-tricks, .hud.card-on .hud-crash { top: calc(var(--sat) + 150px); }
   .cine-sub { bottom: calc(11.5vh + 8px); }
 }
 @media (min-width: 900px) {

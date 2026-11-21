@@ -33,9 +33,11 @@ const BOT_NAMES = ['Zéphyr', 'Minuit', 'Tic-Tac', 'Écho', 'Comète', 'Paradoxe
 function pickQuality() {
   const q = save.data.settings.quality;
   if (q !== 'auto') return q;
-  const small = Math.min(window.innerWidth, window.innerHeight) < 520;
+  const touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   const cores = navigator.hardwareConcurrency || 4;
-  if (small && cores <= 4) return 'medium';
+  const mem = navigator.deviceMemory || 4;
+  // phones and tablets start at medium (adaptive resolution then does the rest)
+  if (touch) return cores <= 4 || mem <= 2 ? 'low' : 'medium';
   return 'high';
 }
 
@@ -163,9 +165,12 @@ export class Game {
     this.installEvt = null;
     this.swReady = false;
     this.wake = null;
-    this.frame = { n: 0, acc: 0, slow: 0, shown: 0 };
+    this.frame = { n: 0, acc: 0, slow: 0, good: 0, shown: 0 };
 
     this.input.onAny = () => this.audio.unlock();
+    // mobile browsers only let sound start on some gestures (touchend, click…), not on pointerdown
+    const kick = () => { if (!this.audio.ready) this.audio.unlock(); };
+    for (const ev of ['touchend', 'pointerup', 'click', 'keydown']) window.addEventListener(ev, kick, { capture: true, passive: true });
     this.input.onPause = () => {
       if (this.state === 'cine') this.cinema.skip();
       else if (this.run && this.run.paused && !this.run.asking) this.resume();
@@ -253,14 +258,27 @@ export class Game {
     f.acc += raw;
     if (f.acc >= 1) {
       const fps = f.n / f.acc;
-      if (save.data.settings.fps) this.fpsEl.textContent = `${fps.toFixed(0)} fps · ${this.quality}`;
-      // automatic quality: step down when the device struggles during a run
-      if (save.data.settings.quality === 'auto' && this.state === 'run' && this.run && !this.run.paused) {
-        f.slow = fps < 40 ? f.slow + 1 : 0;
-        if (f.slow >= 3) {
+      if (save.data.settings.fps) this.fpsEl.textContent = `${fps.toFixed(0)} fps · ${this.quality} · ${Math.round(this.engine.scale * 100)}%`;
+      // automatic quality: lower the resolution first, then the effects; raise it back when there is room
+      if (save.data.settings.quality === 'auto' && (this.state === 'run' || this.state === 'menu') && !(this.run && this.run.paused) && !document.hidden) {
+        const E = this.engine;
+        if (fps < 50) {
+          f.good = 0;
+          if (E.scale > 0.66) E.setScale(E.scale * 0.84);
+          else if (++f.slow >= 2) {
+            f.slow = 0;
+            const next = this.quality === 'high' ? 'medium' : this.quality === 'medium' ? 'low' : null;
+            if (next) {
+              this._setQuality(next);
+              E.setScale(0.85);
+            }
+          }
+        } else {
           f.slow = 0;
-          const next = this.quality === 'high' ? 'medium' : this.quality === 'medium' ? 'low' : null;
-          if (next) this._setQuality(next);
+          if (fps > 57 && E.scale < 1 && ++f.good >= 3) {
+            f.good = 0;
+            E.setScale(E.scale * 1.08);
+          }
         }
       }
       f.n = 0;

@@ -24,22 +24,58 @@ export class AudioEngine {
     return !!this.ctx && this.ctx.state === 'running';
   }
 
-  /** Must be called from a user gesture (autoplay policies). */
+  /**
+   * Must be called from a user gesture (autoplay policies). Safe to call on every
+   * gesture: it only acts while the sound is not running yet.
+   */
   unlock() {
-    if (this.ctx) {
-      if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
-      return;
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      try {
+        this.ctx = new AC({ latencyHint: 'interactive' });
+      } catch (e) {
+        try { this.ctx = new AC(); } catch (e2) { return; }
+      }
+      this._build(this.ctx);
+      this._timer = setInterval(() => this.music.tick(), 45);
     }
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
-    try {
-      this.ctx = new AC({ latencyHint: 'interactive' });
-    } catch (e) {
-      return;
+    const ctx = this.ctx;
+    // iPhone: Web Audio is silenced by the ring/silent switch unless the page
+    // asks for the "playback" category (iOS 17+) or a media element is playing
+    try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch (e) { /* not supported */ }
+    this._keepAlive();
+    if (ctx.state !== 'running') {
+      ctx.resume().catch(() => {});
+      // a one-sample buffer started inside the gesture really opens the output on WebKit
+      try {
+        const src = ctx.createBufferSource();
+        src.buffer = ctx.createBuffer(1, 1, 22050);
+        src.connect(ctx.destination);
+        src.start(0);
+      } catch (e) { /* ignore */ }
     }
-    this._build(this.ctx);
-    this.ctx.resume().catch(() => {});
-    this._timer = setInterval(() => this.music.tick(), 45);
+  }
+
+  /** Silent looping media element (older iPhones: keeps Web Audio audible on silent mode). */
+  _keepAlive() {
+    const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (!ios || typeof Audio === 'undefined') return;
+    if (!this._tag) {
+      // 0.25 s of 8-bit silence at 8 kHz, built in memory
+      const n = 2000, buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+      const w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+      w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+      v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+      w(36, 'data'); v.setUint32(40, n, true);
+      for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);
+      const a = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })));
+      a.loop = true;
+      a.setAttribute('playsinline', '');
+      a.setAttribute('x-webkit-airplay', 'deny');
+      this._tag = a;
+    }
+    if (this._tag.paused && !document.hidden) this._tag.play().catch(() => {});
   }
 
   _build(ctx) {
@@ -201,9 +237,12 @@ export class AudioEngine {
 
   suspend() {
     if (this.ctx && this.ctx.state === 'running') this.ctx.suspend().catch(() => {});
+    if (this._tag && !this._tag.paused) this._tag.pause();
   }
   resume() {
-    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+    // 'interrupted' (iOS, after a call or an app switch) counts as stopped too
+    if (this.ctx && this.ctx.state !== 'running' && this.ctx.state !== 'closed') this.ctx.resume().catch(() => {});
+    if (this._tag) this._keepAlive();
   }
 
   // ------------------------------------------------------------------ sfx

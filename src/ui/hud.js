@@ -82,6 +82,7 @@ export class Hud {
     this.toasts.textContent = '';
     this.combo.classList.add('hidden');
     this.card.classList.add('hidden');
+    this.el.classList.remove('card-on');
     this.year.classList.add('hidden');
     this.count.classList.add('hidden');
     this.crashEl.classList.add('hidden');
@@ -189,7 +190,7 @@ export class Hud {
     const el = h('div.trick', h('b', t(key, { n })), h('i', '+' + fmtNum(points)));
     if (key === 'trick.flip2' || key === 'trick.flip3' || key === 'trick.perfect') el.classList.add('big');
     this.tricks.prepend(el);
-    while (this.tricks.children.length > 4) this.tricks.lastChild.remove();
+    while (this.tricks.children.length > 3) this.tricks.lastChild.remove();
     setTimeout(() => el.remove(), 1500);
   }
 
@@ -240,7 +241,8 @@ export class Hud {
     void c.offsetWidth;
     c.classList.add('play');
     clearTimeout(this._cardT);
-    this._cardT = setTimeout(() => c.classList.add('hidden'), 3000);
+    this.el.classList.add('card-on');
+    this._cardT = setTimeout(() => { c.classList.add('hidden'); this.el.classList.remove('card-on'); }, 2400);
     this.year.classList.add('hidden');
     this.yearAnim = null;
   }
